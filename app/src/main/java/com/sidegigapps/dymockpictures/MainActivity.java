@@ -130,8 +130,8 @@ public class MainActivity extends AppCompatActivity {
         onConnected(mGoogleSignInAccount);
         mAuth = FirebaseAuth.getInstance();
 
-        //GamesClient gamesClient = Games.getGamesClient(MainActivity.this, mGoogleSignInAccount);
-        //gamesClient.setViewForPopups(findViewById(R.id.constraint_layout));
+        GamesClient gamesClient = Games.getGamesClient(MainActivity.this, mGoogleSignInAccount);
+        gamesClient.setViewForPopups(findViewById(R.id.constraint_layout));
 
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
@@ -316,7 +316,7 @@ public class MainActivity extends AppCompatActivity {
         leaderboardItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
             public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
-                //onShowLeaderboardsRequested();
+                onShowLeaderboardsRequested();
                 return true;
             }
         });
@@ -326,7 +326,7 @@ public class MainActivity extends AppCompatActivity {
         achievementsItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
             public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
-                //onShowAchievementsRequested();
+                onShowAchievementsRequested();
                 return true;
             }
         });
@@ -497,7 +497,7 @@ public class MainActivity extends AppCompatActivity {
         editor.putInt(getString(R.string.num_rotations_key), mOutbox.numRotations);
         editor.commit();
         Log.d("RCD","numRotations: " + String.valueOf(mOutbox.numRotations));
-        //pushAccomplishments();
+        pushAccomplishments();
     }
 
     private void updateViewedAchievement(){
@@ -508,7 +508,7 @@ public class MainActivity extends AppCompatActivity {
         editor.putInt(getString(R.string.num_viewed_key), mOutbox.numViewed);
         editor.commit();
         Log.d("RCD","numViewed: " + String.valueOf(mOutbox.numViewed));
-        //pushAccomplishments();
+        pushAccomplishments();
     }
 
     private void getFirebaseDownloadURL(String targetFilename) {
@@ -581,31 +581,31 @@ public class MainActivity extends AppCompatActivity {
 
         //ROTATIONS
         if(mOutbox.numRotations>=1){
-            mAchievementsClient.unlock(getString(R.string.achievement_finding_your_way_around__the_rotate_button));
+            mAchievementsClient.unlock(getString(R.string.achievement_finding_your_way_around__the_new_button));
 
         }
-        if(mOutbox.numRotations>=5){
-            mAchievementsClient.unlock(getString(R.string.achievement_rotate_5_photos));
+        if(mOutbox.numRotations>=10){
+            mAchievementsClient.unlock(getString(R.string.achievement_10_rotations));
 
         }
-        if(mOutbox.numRotations>=50){
-            mAchievementsClient.unlock(getString(R.string.achievement_rotate_50_photos));
+        if(mOutbox.numRotations>=25){
+            mAchievementsClient.unlock(getString(R.string.achievement_25_rotations));
 
         }
         if(mOutbox.numRotations>=100){
-            mAchievementsClient.unlock(getString(R.string.achievement_rotate_100_photos));
+            mAchievementsClient.unlock(getString(R.string.achievement_100_rotations));
 
         }
-        if(mOutbox.numRotations>=250){
-            mAchievementsClient.unlock(getString(R.string.achievement_rotate_250_photos));
+        if(mOutbox.numRotations>=200){
+            mAchievementsClient.unlock(getString(R.string.achievement_200_rotations));
 
         }
         if(mOutbox.numRotations>=500){
-            mAchievementsClient.unlock(getString(R.string.achievement_rotate_500_photos));
+            mAchievementsClient.unlock(getString(R.string.achievement_500_rotations));
 
         }
         if(mOutbox.numRotations>=1000){
-            mAchievementsClient.unlock(getString(R.string.achievement_1k_rotations));
+            mAchievementsClient.unlock(getString(R.string.achievement_tasmanian_devil));
 
         }
 
@@ -614,33 +614,17 @@ public class MainActivity extends AppCompatActivity {
             mAchievementsClient.unlock(getString(R.string.achievement_finding_your_way_around__the_new_button));
         }
         if(mOutbox.numViewed>=10) {
-            mAchievementsClient.unlock(getString(R.string.achievement_view_10_photos));
+            mAchievementsClient.unlock(getString(R.string.achievement_eye_spy_with_my_little_eye));
         }
         if(mOutbox.numViewed>=100) {
-            mAchievementsClient.unlock(getString(R.string.achievement_view_100_photos));
+            mAchievementsClient.unlock(getString(R.string.achievement_wheres_waldo));
         }
         if(mOutbox.numViewed>=250) {
-            mAchievementsClient.unlock(getString(R.string.achievement_view_250_photos));
+            mAchievementsClient.unlock(getString(R.string.achievement_nostalgia_seeker));
         }
-        if(mOutbox.numViewed>=500) {
-            mAchievementsClient.unlock(getString(R.string.achievement_view_500_photos));
-        }
-        if(mOutbox.numViewed>=1000) {
-            mAchievementsClient.unlock(getString(R.string.achievement_1k_photos));
-        }
-        if(mOutbox.numViewed>=2500) {
-            mAchievementsClient.unlock(getString(R.string.achievement_2_5k_photos));
-        }
-        if(mOutbox.numViewed>=5000) {
-            mAchievementsClient.unlock(getString(R.string.achievement_5k_photos));
-        }
-        if(mOutbox.numViewed>=10000) {
-            mAchievementsClient.unlock(getString(R.string.achievement_10k_photos));
-        }
-
         mLeaderboardsClient.submitScore(getString(R.string.leaderboard_rotations),
                 mOutbox.numRotations);
-        mLeaderboardsClient.submitScore(getString(R.string.leaderboard_photos_viewed),
+        mLeaderboardsClient.submitScore(getString(R.string.leaderboard_viewed),
                 mOutbox.numViewed);
 
 
@@ -649,7 +633,7 @@ public class MainActivity extends AppCompatActivity {
     private void onConnected(GoogleSignInAccount googleSignInAccount) {
         Log.d(TAG, "onConnected(): connected to Google APIs");
 
-/*        mAchievementsClient = Games.getAchievementsClient(this, googleSignInAccount);
+        mAchievementsClient = Games.getAchievementsClient(this, googleSignInAccount);
         mLeaderboardsClient = Games.getLeaderboardsClient(this, googleSignInAccount);
         mEventsClient = Games.getEventsClient(this, googleSignInAccount);
         mPlayersClient = Games.getPlayersClient(this, googleSignInAccount);
@@ -669,7 +653,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                         //mMainMenuFragment.setGreeting("Hello, " + displayName);
                     }
-                });*/
+                });
 
     }
 
