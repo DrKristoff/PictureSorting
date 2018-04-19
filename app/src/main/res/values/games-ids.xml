@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Google Play game services IDs.
+Save this file as res/values/games-ids.xml in your project.
+-->
+<resources>
+    <!-- app_id -->
+    <string name="app_id" translatable="false">306195932329</string>
+    <!-- package_name -->
+    <string name="package_name" translatable="false">com.sidegigapps.dymockpicturesorting</string>
+    <!-- achievement Finding Your Way Around:  The New Button -->
+    <string name="achievement_finding_your_way_around__the_new_button" translatable="false">CgkIqcnM1fQIEAIQAg</string>
+    <!-- achievement Finding Your Way Around:  The Rotate Button -->
+    <string name="achievement_finding_your_way_around__the_rotate_button" translatable="false">CgkIqcnM1fQIEAIQAw</string>
+    <!-- achievement Rotate 5 Photos -->
+    <string name="achievement_rotate_5_photos" translatable="false">CgkIqcnM1fQIEAIQBA</string>
+    <!-- achievement Rotate 50 Photos -->
+    <string name="achievement_rotate_50_photos" translatable="false">CgkIqcnM1fQIEAIQBQ</string>
+    <!-- achievement Rotate 100 Photos -->
+    <string name="achievement_rotate_100_photos" translatable="false">CgkIqcnM1fQIEAIQBg</string>
+    <!-- achievement Rotate 250 Photos -->
+    <string name="achievement_rotate_250_photos" translatable="false">CgkIqcnM1fQIEAIQBw</string>
+    <!-- achievement Rotate 500 Photos -->
+    <string name="achievement_rotate_500_photos" translatable="false">CgkIqcnM1fQIEAIQCA</string>
+    <!-- achievement 1K Rotations -->
+    <string name="achievement_1k_rotations" translatable="false">CgkIqcnM1fQIEAIQCQ</string>
+    <!-- achievement View 10 Photos -->
+    <string name="achievement_view_10_photos" translatable="false">CgkIqcnM1fQIEAIQCg</string>
+    <!-- achievement View 100 Photos -->
+    <string name="achievement_view_100_photos" translatable="false">CgkIqcnM1fQIEAIQCw</string>
+    <!-- achievement View 250 Photos -->
+    <string name="achievement_view_250_photos" translatable="false">CgkIqcnM1fQIEAIQDA</string>
+    <!-- achievement View 500 Photos -->
+    <string name="achievement_view_500_photos" translatable="false">CgkIqcnM1fQIEAIQDQ</string>
+    <!-- achievement 1K Photos -->
+    <string name="achievement_1k_photos" translatable="false">CgkIqcnM1fQIEAIQDg</string>
+    <!-- achievement 2.5K Photos -->
+    <string name="achievement_2.5k_photos" translatable="false">CgkIqcnM1fQIEAIQDw</string>
+    <!-- achievement 5K Photos -->
+    <string name="achievement_5k_photos" translatable="false">CgkIqcnM1fQIEAIQEA</string>
+    <!-- achievement 10K Photos -->
+    <string name="achievement_10k_photos" translatable="false">CgkIqcnM1fQIEAIQEQ</string>
+    <!-- leaderboard Rotations -->
+    <string name="leaderboard_rotations" translatable="false">CgkIqcnM1fQIEAIQEg</string>
+    <!-- leaderboard Photos Viewed -->
+    <string name="leaderboard_photos_viewed" translatable="false">CgkIqcnM1fQIEAIQEw</string>
+</resources>

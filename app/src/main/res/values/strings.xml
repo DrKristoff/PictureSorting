@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Family Picture Sorting</string>
+    <string name="players_exception">PLAYERS EXCEPTION</string>
+    <string name="achievements_exception">ACHIEVEMENTS EXCEPTION</string>
+    <string name="leaderboards_exception">LEADERBOARDS EXCEPTION</string>
+    <string name="status_exception_error">status exception error</string>
+    <string name="your_progress_will_be_uploaded">Your Progress Will Be Uploaded</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="num_rotations_key">rotations_key</string>
+    <string name="num_viewed_key">viewed_key</string>
+</resources>

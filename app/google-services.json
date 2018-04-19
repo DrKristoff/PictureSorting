@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "256449474276",
+    "firebase_url": "https://dymock-pictures-android.firebaseio.com",
+    "project_id": "dymock-pictures-android",
+    "storage_bucket": "dymock-pictures-android.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:256449474276:android:644f77c42b3d6779",
+        "android_client_info": {
+          "package_name": "com.sidegigapps.dymockpictures"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "256449474276-tbv6pigq684vbklkohad96u95l86aosg.apps.googleusercontent.com",
+          "client_type": 3
+        },
+        {
+          "client_id": "256449474276-tt1i3qmhjr366p199gamp96qav34h590.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sidegigapps.dymockpictures",
+            "certificate_hash": "538dfc1c741ae9c4c94ae758b7159b7b72954088"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwLPk4D59OeKDnMeCQdk-aEIeACqr7KTc"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "256449474276-tbv6pigq684vbklkohad96u95l86aosg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
