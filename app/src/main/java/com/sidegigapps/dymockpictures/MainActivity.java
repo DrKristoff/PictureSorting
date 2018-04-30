@@ -94,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
     private LeaderboardsClient mLeaderboardsClient;
     private EventsClient mEventsClient;
     private PlayersClient mPlayersClient;
+    private GamesClient gamesClient;
 
     private static final int REQUEST_CODE = 1;
     private static final int RC_SIGN_IN = 9001;
@@ -130,7 +131,7 @@ public class MainActivity extends AppCompatActivity {
         onConnected(mGoogleSignInAccount);
         mAuth = FirebaseAuth.getInstance();
 
-        GamesClient gamesClient = Games.getGamesClient(MainActivity.this, mGoogleSignInAccount);
+        gamesClient = Games.getGamesClient(MainActivity.this, mGoogleSignInAccount);
         gamesClient.setViewForPopups(findViewById(R.id.constraint_layout));
 
         mToolbar = findViewById(R.id.toolbar);
@@ -545,6 +546,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onShowLeaderboardsRequested() {
+
         mLeaderboardsClient.getAllLeaderboardsIntent()
                 .addOnSuccessListener(new OnSuccessListener<Intent>() {
                     @Override
@@ -622,9 +624,9 @@ public class MainActivity extends AppCompatActivity {
         if(mOutbox.numViewed>=250) {
             mAchievementsClient.unlock(getString(R.string.achievement_nostalgia_seeker));
         }
-        mLeaderboardsClient.submitScore(getString(R.string.leaderboard_rotations),
+        mLeaderboardsClient.submitScoreImmediate(getString(R.string.leaderboard_rotations),
                 mOutbox.numRotations);
-        mLeaderboardsClient.submitScore(getString(R.string.leaderboard_viewed),
+        mLeaderboardsClient.submitScoreImmediate(getString(R.string.leaderboard_viewed),
                 mOutbox.numViewed);
 
 
