@@ -1,4 +1,4 @@
-package com.sidegigapps.dymockpictures;
+package com.sidegigapps.dymockpictures.fragments;
 
 import android.Manifest;
 import android.app.DownloadManager;
@@ -28,6 +28,8 @@ import com.jsibbold.zoomage.ZoomageView;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
 import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
+import com.sidegigapps.dymockpictures.GlideApp;
+import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 
 import org.json.JSONException;
@@ -139,7 +141,7 @@ public class ViewPhotosFragment extends Fragment {
         fab_new = view.findViewById(R.id.fab_new);
         fab_rotate = view.findViewById(R.id.fab_rotate);
         fab_save = view.findViewById(R.id.fab_save);
-        
+
         setupFABs();
 
         return view;

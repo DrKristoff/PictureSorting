@@ -5,8 +5,6 @@ import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -18,13 +16,8 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
-import android.widget.Toast;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.games.Games;
-import com.google.android.gms.games.Player;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -40,8 +33,12 @@ import com.mikepenz.materialdrawer.model.interfaces.IProfile;
 import com.mikepenz.materialdrawer.util.AbstractDrawerImageLoader;
 import com.mikepenz.materialdrawer.util.DrawerImageLoader;
 import com.mikepenz.materialdrawer.util.DrawerUIUtils;
+import com.sidegigapps.dymockpictures.fragments.AchievementsFragment;
+import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
+import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 
-public class MainActivity extends AppCompatActivity implements ViewPhotosFragment.OnFragmentInteractionListener {
+public class MainActivity extends AppCompatActivity implements
+        ViewPhotosFragment.OnFragmentInteractionListener {
 
     private GoogleSignInAccount mGoogleSignInAccount;
     private SharedPreferences prefs;
@@ -49,7 +46,11 @@ public class MainActivity extends AppCompatActivity implements ViewPhotosFragmen
     private static final String TAG = "RCD";
     private Toolbar mToolbar;
     private ViewPhotosFragment viewPhotosFragment;
+    private LeaderboardFragment leaderboardFragment;
+    private AchievementsFragment achievementsFragment;
     private StorageReference mStorageRef;
+
+    Drawer drawer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,14 +69,7 @@ public class MainActivity extends AppCompatActivity implements ViewPhotosFragmen
         setSupportActionBar(mToolbar);
         setupDrawer();
 
-        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-        viewPhotosFragment = new ViewPhotosFragment();
-
-        ft.replace(R.id.fragment_layout, viewPhotosFragment);
-
-        ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
-        ft.commit();
-
+        showPhotos();
     }
 
 
@@ -178,12 +172,24 @@ public class MainActivity extends AppCompatActivity implements ViewPhotosFragmen
                 })
                 .build();
 
+        PrimaryDrawerItem viewPhotosItem = new PrimaryDrawerItem()
+                .withName("View Photos");
+        viewPhotosItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
+            @Override
+            public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
+                showPhotos();
+                drawer.closeDrawer();
+                return true;
+            }
+        });
+
         PrimaryDrawerItem leaderboardItem = new PrimaryDrawerItem()
                 .withName("Leaderboards");
         leaderboardItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
             public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
-                //onShowLeaderboardsRequested();
+                showLeaderboards();
+                drawer.closeDrawer();
                 return true;
             }
         });
@@ -193,16 +199,47 @@ public class MainActivity extends AppCompatActivity implements ViewPhotosFragmen
         achievementsItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
             public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
-                //onShowAchievementsRequested();
+                showAchievements();
+                drawer.closeDrawer();
                 return true;
             }
         });
 
-        new DrawerBuilder().withActivity(this)
+        drawer = new DrawerBuilder().withActivity(this)
                 .withAccountHeader(headerResult)
                 .withToolbar(mToolbar)
-                .addDrawerItems(leaderboardItem,achievementsItem)
+                .addDrawerItems(viewPhotosItem,leaderboardItem,achievementsItem)
                 .build();
+
+    }
+
+    private void showPhotos(){
+        getSupportActionBar().setTitle("Family Picture Sorting");
+        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        viewPhotosFragment = new ViewPhotosFragment();
+
+        ft.replace(R.id.fragment_layout, viewPhotosFragment);
+
+        ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
+        ft.commit();
+    }
+
+    private void showAchievements() {
+        getSupportActionBar().setTitle("Achievements");
+        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        achievementsFragment = new AchievementsFragment();
+        ft.replace(R.id.fragment_layout, achievementsFragment);
+        ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
+        ft.commit();
+    }
+
+    private void showLeaderboards() {
+        getSupportActionBar().setTitle("Leaderboards");
+        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        leaderboardFragment = new LeaderboardFragment();
+        ft.replace(R.id.fragment_layout, leaderboardFragment);
+        ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
+        ft.commit();
 
     }
 
