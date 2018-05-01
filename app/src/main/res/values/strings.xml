@@ -8,4 +8,7 @@
     <string name="sign_out">Sign Out</string>
     <string name="num_rotations_key">rotations_key</string>
     <string name="num_viewed_key">viewed_key</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
