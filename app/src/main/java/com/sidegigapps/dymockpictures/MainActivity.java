@@ -19,6 +19,11 @@ import android.widget.ImageView;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.mikepenz.iconics.IconicsDrawable;
@@ -37,6 +42,8 @@ import com.sidegigapps.dymockpictures.fragments.AchievementsFragment;
 import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
 import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 
+import java.util.HashMap;
+
 public class MainActivity extends AppCompatActivity implements
         ViewPhotosFragment.OnFragmentInteractionListener {
 
@@ -49,6 +56,10 @@ public class MainActivity extends AppCompatActivity implements
     private LeaderboardFragment leaderboardFragment;
     private AchievementsFragment achievementsFragment;
     private StorageReference mStorageRef;
+    private DatabaseReference mDatabase;
+    private DatabaseReference mUsersReference;
+    private DatabaseReference mLeaderboardReference;
+    private LeaderboardData mLeaderboardData;
 
     Drawer drawer;
 
@@ -64,12 +75,62 @@ public class MainActivity extends AppCompatActivity implements
         mAuth = FirebaseAuth.getInstance();
 
         mStorageRef = FirebaseStorage.getInstance().getReference();
+        mDatabase = FirebaseDatabase.getInstance().getReference();
+
+        mUsersReference = mDatabase.child("users");
+        mLeaderboardReference = mDatabase.child("leaderboards");
+
+        loadLeaderboardData();
 
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
         setupDrawer();
 
         showPhotos();
+    }
+
+    private void loadLeaderboardData() {
+        mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                if (snapshot.child(mGoogleSignInAccount.getId()).exists()) {
+                    Log.d("RCD","account already exists: " + mGoogleSignInAccount.getId());
+                    HashMap<String,Object> map = (HashMap<String, Object>) snapshot.getValue();
+
+                    mLeaderboardData = new LeaderboardData(map, mGoogleSignInAccount.getId());
+
+                }else{
+                    Log.d("RCD","account does not exist: " + mGoogleSignInAccount.getId());
+                    LeaderboardData data = new LeaderboardData(mGoogleSignInAccount);
+                    mUsersReference.child(data.uuid).setValue(data);
+                    Log.d("RCD","user created");
+                }
+            }
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+            }
+        });
+
+
+
+        ValueEventListener leaderboardDataListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // Get Post object and use the values to update the UI
+                LeaderboardData data = dataSnapshot.getValue(LeaderboardData.class);
+                // ...
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                // Getting Post failed, log a message
+                Log.w(TAG, "loadPost:onCancelled", databaseError.toException());
+                // ...
+            }
+        };
+
+        mUsersReference.addValueEventListener(leaderboardDataListener);
+
     }
 
 
@@ -110,8 +171,11 @@ public class MainActivity extends AppCompatActivity implements
 
     }
 
-    private void onConnected(GoogleSignInAccount googleSignInAccount) {
+    private void onConnected(GoogleSignInAccount acct) {
         Log.d(TAG, "onConnected(): connected to Google APIs");
+        String uuid = acct.getId();
+        String photoURL = acct.getPhotoUrl().toString();
+        String name = acct.getDisplayName();
 
     }
 
