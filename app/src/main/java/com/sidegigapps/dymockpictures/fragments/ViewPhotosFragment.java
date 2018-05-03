@@ -188,7 +188,6 @@ public class ViewPhotosFragment extends Fragment {
     }
 
     private String getNextURL(){
-        Log.d("RCD",String.valueOf(queuedFileNames.size()));
         urlMap.remove(targetFilename); //remove old targetFileName from map
 
         if(queuedFileNames.size()==0){
@@ -212,6 +211,8 @@ public class ViewPhotosFragment extends Fragment {
     private void fetchNewTargetImage() {
 
         if (targetImageRotation != 0f) {
+
+            uploadBitmapToFirebase(targetFilename,targetImageRotation);
             //updateRotationsAchievement();  //implies that the previous image was rotated.  Checking when fetching a new image so that you can't get unlimited rotations, it only checks when you are done
         }
 
@@ -309,12 +310,9 @@ public class ViewPhotosFragment extends Fragment {
                 .transform(new RotateTransformation(getActivity(), targetImageRotation))
                 .into(targetImage);
         targetImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
-
-        uploadBitmapToFirebase();
-
     }
 
-    private void uploadBitmapToFirebase() {
+    private void uploadBitmapToFirebase(final String filename, final float rotation) {
 
         ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(getActivity())
                 .build();
@@ -324,14 +322,14 @@ public class ViewPhotosFragment extends Fragment {
         imageLoader.loadImage(targetFilenameURL, new SimpleImageLoadingListener() {
             @Override
             public void onLoadingComplete(String imageUri, View view, Bitmap loadedImage) {
-                RotateTransformation transformation = new RotateTransformation(getActivity(), targetImageRotation);
+                RotateTransformation transformation = new RotateTransformation(getActivity(), rotation);
                 Bitmap rotated = transformation.transform(loadedImage);
 
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 rotated.compress(Bitmap.CompressFormat.JPEG, 100, baos);
                 byte[] data = baos.toByteArray();
 
-                StorageReference reference = mStorageRef.child(targetFilename);
+                StorageReference reference = mStorageRef.child(filename);
                 UploadTask uploadTask = reference.putBytes(data);
                 uploadTask.addOnFailureListener(new OnFailureListener() {
                     @Override
