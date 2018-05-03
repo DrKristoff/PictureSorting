@@ -17,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnFailureListener;
@@ -35,17 +36,20 @@ import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
 public class ViewPhotosFragment extends Fragment {
-
 
     private static final int REQUEST_CODE = 1;
     private StorageReference mStorageRef;
@@ -56,6 +60,12 @@ public class ViewPhotosFragment extends Fragment {
     private float targetImageRotation = 0f;
     private String targetFilename;
     private FloatingActionButton fab_rotate, fab_new, fab_save;
+    private ProgressBar progressBar;
+
+    private boolean isLoading = true;
+
+    HashMap<String,String> urlMap = new HashMap<>();
+    LinkedList<String> queuedFileNames = new LinkedList<>();
 
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
@@ -70,15 +80,6 @@ public class ViewPhotosFragment extends Fragment {
         // Required empty public constructor
     }
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment ViewPhotosFragment.
-     */
-    // TODO: Rename and change types and number of parameters
     public static ViewPhotosFragment newInstance(String param1, String param2) {
         ViewPhotosFragment fragment = new ViewPhotosFragment();
         Bundle args = new Bundle();
@@ -95,38 +96,48 @@ public class ViewPhotosFragment extends Fragment {
             mParam1 = getArguments().getString(ARG_PARAM1);
             mParam2 = getArguments().getString(ARG_PARAM2);
         }
-
-        loadJSONFromAsset();
         mStorageRef = FirebaseStorage.getInstance().getReference();
+
+        //loadJSONFromAsset();
+        loadFileNames();
     }
 
-    private void loadJSONFromAsset() {
+    private void loadFileNames() {
+        Log.d("RCD","loadFileNames");
         String json = null;
+        InputStream is = null;
+        BufferedReader reader;
         try {
-            InputStream is = getActivity().getAssets().open("downloads.json");
-            int size = is.available();
-            byte[] buffer = new byte[size];
-            is.read(buffer);
+            is = getActivity().getAssets().open("filenames.txt");
+            reader = new BufferedReader(new InputStreamReader(is));
+            String filename = reader.readLine();
+            while(filename != null){
+                filenames.add(filename);
+                filename = reader.readLine();
+            }
             is.close();
-            json = new String(buffer, "UTF-8");
+            loadDownloadLinks();
         } catch (IOException ex) {
             ex.printStackTrace();
             return;
-        }
-
-        try {
-            JSONObject jsonObject = new JSONObject(json);
-            Iterator<?> keys = jsonObject.keys();
-
-            while (keys.hasNext()) {
-                String key = (String) keys.next();
-                downloadLinksMap.put(key, jsonObject.getString(key));
-                filenames.add(key);
+        } finally {
+            try {
+                if (is != null)
+                    is.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
             }
 
-            Log.d("RCD", "Finished filling map with size " + String.valueOf(downloadLinksMap.size()));
-        } catch (JSONException e) {
-            e.printStackTrace();
+        }
+    }
+
+    private void onURLsDownloaded(){
+        Log.d("RCD","onURLsDownloaded");
+        if(isLoading){
+            targetImage.setVisibility(View.VISIBLE);
+            progressBar.setVisibility(View.INVISIBLE);
+            isLoading = false;
+            fetchNewTargetImage();
         }
     }
 
@@ -136,7 +147,7 @@ public class ViewPhotosFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_view_photos, container, false);
 
         targetImage = view.findViewById(R.id.targetImage);
-        fetchNewTargetImage();
+        progressBar = view.findViewById(R.id.indeterminateBar);
 
         fab_new = view.findViewById(R.id.fab_new);
         fab_rotate = view.findViewById(R.id.fab_rotate);
@@ -176,9 +187,31 @@ public class ViewPhotosFragment extends Fragment {
 
     }
 
+    private String getNextURL(){
+        Log.d("RCD",String.valueOf(queuedFileNames.size()));
+        urlMap.remove(targetFilename); //remove old targetFileName from map
+
+        if(queuedFileNames.size()==0){
+            return null;
+        }
+
+        targetFilename = queuedFileNames.pop();
+        String url = urlMap.get(targetFilename);
+        return url;
+    }
+
+    private void loadDownloadLinks(){
+        if(urlMap.size()>5) return;
+        Random random = new Random();
+
+        int index = random.nextInt(filenames.size());
+        String filename = filenames.get(index);
+        getFirebaseDownloadURL(filename);
+    }
+
     private void fetchNewTargetImage() {
 
-        if(targetImageRotation!=0f){
+        if (targetImageRotation != 0f) {
             //updateRotationsAchievement();  //implies that the previous image was rotated.  Checking when fetching a new image so that you can't get unlimited rotations, it only checks when you are done
         }
 
@@ -186,15 +219,13 @@ public class ViewPhotosFragment extends Fragment {
 
         if (filenames.size() < 1) return;
 
-        Random random = new Random();
-        int index = random.nextInt(filenames.size());
-        targetFilename = filenames.get(index);
+        targetFilenameURL = getNextURL();
 
-        //FOR TESTING
-        //targetFilename = "0001.JPG.";
-        //downloadLinksMap.put(targetFilename,"https://firebasestorage.googleapis.com/v0/b/photo-organization-1e84f.appspot.com/o/0001.jpg?alt=media&token=0e5a75c8-9c95-4a62-b772-09e9d8534765");
-
-        targetFilenameURL = downloadLinksMap.get(targetFilename);
+        if(targetFilenameURL==null){
+            isLoading = true;
+            loadDownloadLinks();
+            return;
+        }
 
         Log.d("RCD", targetFilenameURL);
 
@@ -207,6 +238,7 @@ public class ViewPhotosFragment extends Fragment {
         targetImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
         //updateViewedAchievement();
+        loadDownloadLinks();
     }
 
     public void onButtonPressed(Uri uri) {
@@ -249,22 +281,21 @@ public class ViewPhotosFragment extends Fragment {
 
     }
 
-    public void onNewFabPressed(){
+    public void onNewFabPressed() {
         fetchNewTargetImage();
     }
 
-    public void onSaveFABPressed(){
+    public void onSaveFABPressed() {
         downloadTargetImage();
         Toast.makeText(getActivity(), "Saving Image", Toast.LENGTH_SHORT).show();
     }
 
-    public void onRotateFabPressed(){
+    public void onRotateFabPressed() {
         targetImageRotation = targetImageRotation - 90;
         if (targetImageRotation < 0)
             targetImageRotation = targetImageRotation + 360;
         rotateTargetImage();
         Toast.makeText(getActivity(), "Rotated Left", Toast.LENGTH_SHORT).show();
-
 
     }
 
@@ -311,7 +342,6 @@ public class ViewPhotosFragment extends Fragment {
                     @Override
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                         Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();
-                        getFirebaseDownloadURL(targetFilename);
                     }
                 });
             }
@@ -320,13 +350,13 @@ public class ViewPhotosFragment extends Fragment {
 
     }
 
-    private void getFirebaseDownloadURL(String targetFilename) {
-
-        mStorageRef.child(targetFilename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+    private void getFirebaseDownloadURL(final String filename) {
+        mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
             @Override
             public void onSuccess(Uri uri) {
-                Log.d("RCD", "SUCCESS");
-                Log.d("RCD", uri.toString());
+                urlMap.put(filename,uri.toString());
+                queuedFileNames.add(filename);
+                onURLsDownloaded();
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
@@ -338,7 +368,6 @@ public class ViewPhotosFragment extends Fragment {
     }
 
     public interface OnFragmentInteractionListener {
-        // TODO: Update argument type and name
         void onFragmentInteraction(Uri uri);
     }
 }

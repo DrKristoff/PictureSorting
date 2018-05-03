@@ -194,7 +194,7 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-        PrimaryDrawerItem achievementsItem = new PrimaryDrawerItem()
+/*        PrimaryDrawerItem achievementsItem = new PrimaryDrawerItem()
                 .withName("Achievements");
         achievementsItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
@@ -203,12 +203,12 @@ public class MainActivity extends AppCompatActivity implements
                 drawer.closeDrawer();
                 return true;
             }
-        });
+        });*/
 
         drawer = new DrawerBuilder().withActivity(this)
                 .withAccountHeader(headerResult)
                 .withToolbar(mToolbar)
-                .addDrawerItems(viewPhotosItem,leaderboardItem,achievementsItem)
+                .addDrawerItems(viewPhotosItem,leaderboardItem) //no achievements for now
                 .build();
 
     }
