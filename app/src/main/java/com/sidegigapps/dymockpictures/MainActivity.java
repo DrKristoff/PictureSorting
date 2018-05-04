@@ -41,12 +41,21 @@ import com.mikepenz.materialdrawer.util.DrawerUIUtils;
 import com.sidegigapps.dymockpictures.fragments.AchievementsFragment;
 import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
 import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
+import com.sidegigapps.dymockpictures.models.Leaderboard;
+import com.sidegigapps.dymockpictures.models.UserData;
 
 import java.util.HashMap;
 
 public class MainActivity extends AppCompatActivity implements
         ViewPhotosFragment.OnFragmentInteractionListener {
 
+
+    private static final String LEADERBOARDS = "leaderboards";
+    private static final String USERS = "users";
+    private static final String LEADERBOARD_VIEWS = "views";
+    private static final String LEADERBOARD_ROTATIONS = "rotations";
+    private static final String LEADERBOARD_SORTED ="sorted";
+    private static final String LEADERBOARD_TRANSCRIBED = "transcribed";
     private GoogleSignInAccount mGoogleSignInAccount;
     private SharedPreferences prefs;
     private FirebaseAuth mAuth;
@@ -59,7 +68,19 @@ public class MainActivity extends AppCompatActivity implements
     private DatabaseReference mDatabase;
     private DatabaseReference mUsersReference;
     private DatabaseReference mLeaderboardReference;
-    private LeaderboardData mLeaderboardData;
+    private UserData mUserData;
+    private HashMap<String,Leaderboard> mLeaderboardsMap = new HashMap<>();
+
+    public boolean mUserDataLoaded = false;
+    public boolean mLeaderboardDataLoaded = false;
+    private boolean mSetupComplete = false;
+
+    final String [] leaderboards = new String []{
+            LEADERBOARD_ROTATIONS,
+            LEADERBOARD_VIEWS,
+            LEADERBOARD_SORTED,
+            LEADERBOARD_TRANSCRIBED
+    };
 
     Drawer drawer;
 
@@ -77,16 +98,26 @@ public class MainActivity extends AppCompatActivity implements
         mStorageRef = FirebaseStorage.getInstance().getReference();
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
-        mUsersReference = mDatabase.child("users");
-        mLeaderboardReference = mDatabase.child("leaderboards");
+        mUsersReference = mDatabase.child(USERS);
+        mLeaderboardReference = mDatabase.child(LEADERBOARDS);
 
         loadLeaderboardData();
 
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
         setupDrawer();
+    }
 
-        showPhotos();
+    private void onLeaderboardDataLoaded(){
+        if(!(mUserDataLoaded && mLeaderboardDataLoaded)) return;
+
+        if(mSetupComplete){
+            return;
+        } else {
+            mSetupComplete = true;
+            showPhotos();
+        }
+
     }
 
     private void loadLeaderboardData() {
@@ -96,40 +127,72 @@ public class MainActivity extends AppCompatActivity implements
                 if (snapshot.child(mGoogleSignInAccount.getId()).exists()) {
                     Log.d("RCD","account already exists: " + mGoogleSignInAccount.getId());
                     HashMap<String,Object> map = (HashMap<String, Object>) snapshot.getValue();
-
-                    mLeaderboardData = new LeaderboardData(map, mGoogleSignInAccount.getId());
-
+                    mUserData = new UserData(map, mGoogleSignInAccount.getId());
                 }else{
                     Log.d("RCD","account does not exist: " + mGoogleSignInAccount.getId());
-                    LeaderboardData data = new LeaderboardData(mGoogleSignInAccount);
+                    UserData data = new UserData(mGoogleSignInAccount);
                     mUsersReference.child(data.uuid).setValue(data);
                     Log.d("RCD","user created");
                 }
+
+                mUserDataLoaded = true;
+                onLeaderboardDataLoaded();
             }
             @Override
             public void onCancelled(DatabaseError databaseError) {
             }
         });
 
-
-
-        ValueEventListener leaderboardDataListener = new ValueEventListener() {
+        mLeaderboardReference.addValueEventListener(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                // Get Post object and use the values to update the UI
-                LeaderboardData data = dataSnapshot.getValue(LeaderboardData.class);
-                // ...
-            }
+            public void onDataChange(DataSnapshot snapshot) {
+                mLeaderboardDataLoaded = false;
+                for(String leaderboardName: leaderboards){
+                    if (snapshot.child(leaderboardName).exists()) {
+                        HashMap<String,Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
+                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName,map);
+                        mLeaderboardsMap.put(leaderboardName,newLeaderboard);
+                    }else{
+                        Log.d("RCD","leaderboard does not exist: " + leaderboardName);
+                        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(0);
+                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName);
+                        mLeaderboardsMap.put(leaderboardName,newLeaderboard);
+                    }
+                }
 
+                mLeaderboardDataLoaded = true;
+                onLeaderboardDataLoaded();
+
+            }
             @Override
             public void onCancelled(DatabaseError databaseError) {
-                // Getting Post failed, log a message
-                Log.w(TAG, "loadPost:onCancelled", databaseError.toException());
-                // ...
             }
-        };
+        });
 
-        mUsersReference.addValueEventListener(leaderboardDataListener);
+    }
+
+    public void incrementRotations(){
+        incrementScores(LEADERBOARD_ROTATIONS);
+    }
+    public void incrementViews(){
+        incrementScores(LEADERBOARD_VIEWS);
+    }
+    public void incrementSorts(){
+        incrementScores(LEADERBOARD_SORTED);
+    }
+    public void incrementTranscribes(){
+        incrementScores(LEADERBOARD_TRANSCRIBED);
+    }
+
+    public void incrementScores(String leaderboardName){
+        Leaderboard leaderboard = mLeaderboardsMap.get(leaderboardName);
+        long score = leaderboard.getRotationsByUUID(mUserData.uuid);
+        score +=1;
+        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(score);
+
+        Log.d("RCD","UPDATING " + leaderboardName);
+        Log.d("RCD","NOW " + String.valueOf(score));
+
 
     }
 

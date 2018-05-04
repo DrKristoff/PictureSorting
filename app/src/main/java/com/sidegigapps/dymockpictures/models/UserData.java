@@ -1,34 +1,33 @@
-package com.sidegigapps.dymockpictures;
-
+package com.sidegigapps.dymockpictures.models;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class LeaderboardData {
+public class UserData {
 
     public String uuid;
     public String name;
     public String url;
-    public long rotationsCount;
-    public long viewsCount;
-    public long sortedCount;
-    public long transcribedCount;
+    private long rotationsCount;
+    private long viewsCount;
+    private long sortedCount;
+    private long transcribedCount;
 
-    public LeaderboardData(HashMap<String, Object> map){
-        // Default constructor required for calls to DataSnapshot.getValue(LeaderboardData.class)
+    public UserData(){
+        // Default constructor required for calls to DataSnapshot.getValue(UserData.class)
     }
 
-    public LeaderboardData(HashMap<String, Object> map, String id) {
+    public UserData(HashMap<String, Object> map, String id) {
 
         HashMap<String,Object> results = (HashMap<String, Object>) map.get(id);
 
         this.uuid = (String) results.get("uuid");
-        this.rotationsCount = (Long) results.get("rotationsCount");
-        this.viewsCount = (long) results.get("viewsCount");
-        this.sortedCount = (long) results.get("sortedCount");
-        this.transcribedCount = (long) results.get("transcribedCount");
+        //this.rotationsCount = (Long) results.get("rotationsCount");
+        //this.viewsCount = (long) results.get("viewsCount");
+        //this.sortedCount = (long) results.get("sortedCount");
+        //this.transcribedCount = (long) results.get("transcribedCount");
         this.name = (String) results.get("name");
         this.url = (String) results.get("url");
 
@@ -90,23 +89,14 @@ public class LeaderboardData {
         this.transcribedCount = transcribedCount;
     }
 
-    public LeaderboardData(String uuid, String name, String url){
+    public UserData(String uuid, String name, String url){
         this.uuid = uuid;
-
-        this.rotationsCount = 0;
-        this.viewsCount = 0;
-        this.sortedCount = 0;
-        this.transcribedCount = 0;
         this.name = name;
         this.url = url;
     }
 
-    public LeaderboardData (GoogleSignInAccount acct){
+    public UserData(GoogleSignInAccount acct){
         this.uuid = acct.getId();
-        this.rotationsCount = 0;
-        this.viewsCount = 0;
-        this.sortedCount = 0;
-        this.transcribedCount = 0;
         this.name = acct.getDisplayName();
         this.url = acct.getPhotoUrl().toString();
 
@@ -117,11 +107,10 @@ public class LeaderboardData {
         result.put("uuid", uuid);
         result.put("name", name);
         result.put("url", uuid);
-        result.put("rotationsCount", rotationsCount);
-        result.put("viewsCount", viewsCount);
-        result.put("sortedCount", sortedCount);
-        result.put("transcribedCount", transcribedCount);
-
+        //result.put("rotationsCount", rotationsCount);
+        //result.put("viewsCount", viewsCount);
+        //result.put("sortedCount", sortedCount);
+        //result.put("transcribedCount", transcribedCount);
         return result;
     }
 

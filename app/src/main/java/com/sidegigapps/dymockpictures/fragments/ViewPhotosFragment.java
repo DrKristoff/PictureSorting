@@ -30,6 +30,7 @@ import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
 import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
 import com.sidegigapps.dymockpictures.GlideApp;
+import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 
@@ -131,8 +132,10 @@ public class ViewPhotosFragment extends Fragment {
         }
     }
 
-    private void onURLsDownloaded(){
+    public void onURLsDownloaded(){
         Log.d("RCD","onURLsDownloaded");
+        Log.d("RCD","isLoading is " + String.valueOf(isLoading));
+
         if(isLoading){
             targetImage.setVisibility(View.VISIBLE);
             progressBar.setVisibility(View.INVISIBLE);
@@ -191,16 +194,22 @@ public class ViewPhotosFragment extends Fragment {
         urlMap.remove(targetFilename); //remove old targetFileName from map
 
         if(queuedFileNames.size()==0){
+            String.valueOf("queuedFileNames was null");
             return null;
         }
 
         targetFilename = queuedFileNames.pop();
         String url = urlMap.get(targetFilename);
+
+        if(null==url){
+            Log.d("RCD","Tried to find " + targetFilename + " but wasn't there");
+            Log.d("RCD",urlMap.toString());
+        }
         return url;
     }
 
     private void loadDownloadLinks(){
-        if(urlMap.size()>5) return;
+        if(urlMap.size()>1) return;
         Random random = new Random();
 
         int index = random.nextInt(filenames.size());
@@ -209,11 +218,10 @@ public class ViewPhotosFragment extends Fragment {
     }
 
     private void fetchNewTargetImage() {
-
+        Log.d("RCD","fetchNewTargetImage");
         if (targetImageRotation != 0f) {
-
             uploadBitmapToFirebase(targetFilename,targetImageRotation);
-            //updateRotationsAchievement();  //implies that the previous image was rotated.  Checking when fetching a new image so that you can't get unlimited rotations, it only checks when you are done
+            incrementRotations();  //implies that the previous image was rotated.
         }
 
         targetImageRotation = 0f;
@@ -223,6 +231,7 @@ public class ViewPhotosFragment extends Fragment {
         targetFilenameURL = getNextURL();
 
         if(targetFilenameURL==null){
+            Log.d("RCD","targetFilenameURL was null");
             isLoading = true;
             loadDownloadLinks();
             return;
@@ -240,6 +249,16 @@ public class ViewPhotosFragment extends Fragment {
 
         //updateViewedAchievement();
         loadDownloadLinks();
+
+        incrementViews();
+    }
+
+    private void incrementViews() {
+        ((MainActivity)getActivity()).incrementViews();
+    }
+
+    private void incrementRotations() {
+        ((MainActivity)getActivity()).incrementRotations();
     }
 
     public void onButtonPressed(Uri uri) {
