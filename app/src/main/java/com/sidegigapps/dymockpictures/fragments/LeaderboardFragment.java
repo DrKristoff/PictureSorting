@@ -14,6 +14,7 @@ import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.sidegigapps.dymockpictures.GlideApp;
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
@@ -117,27 +118,6 @@ public class LeaderboardFragment extends Fragment {
 
         showLeaderboard(MainActivity.LEADERBOARD_VIEWS);
 
-        /*rotationsButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showLeaderboard(MainActivity.LEADERBOARD_ROTATIONS);
-            }
-        });
-
-        viewsButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showLeaderboard(MainActivity.LEADERBOARD_VIEWS);
-            }
-        });
-
-        downloadsButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showLeaderboard(MainActivity.LEADERBOARD_DOWNLOADS);
-            }
-        });*/
-
         return view;
     }
 
@@ -151,11 +131,7 @@ public class LeaderboardFragment extends Fragment {
     private class LeaderboardAdapter extends RecyclerView.Adapter<LeaderboardAdapter.ViewHolder> {
         private Leaderboard mLeaderboard;
 
-        // Provide a reference to the views for each data item
-        // Complex data items may need more than one view per item, and
-        // you provide access to all the views for a data item in a view holder
         public class ViewHolder extends RecyclerView.ViewHolder {
-            // each data item is just a string in this case
             public TextView mRankTextView;
             public TextView mNameTextView;
             public ImageView mProfileImageView;
@@ -193,8 +169,11 @@ public class LeaderboardFragment extends Fragment {
 
             holder.mNameTextView.setText(userData.getName());
             holder.mRankTextView.setText(String.valueOf(position+1));
-            //holder.mProfileImageView.set;
             holder.mScoreTextView.setText(String.valueOf(mLeaderboard.getScoreByUUID(uuid)));
+            GlideApp.with(getActivity())
+                    .load(userData.getUrl())
+                    .placeholder(R.drawable.progress_animation)
+                    .into(holder.mProfileImageView);
         }
 
         // Return the size of your dataset (invoked by the layout manager)
