@@ -50,7 +50,7 @@ public class SignInActivity extends AppCompatActivity {
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
-                .requestScopes(Games.SCOPE_GAMES_LITE)
+                //.requestScopes(Games.SCOPE_GAMES_LITE)
                 .build();
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);

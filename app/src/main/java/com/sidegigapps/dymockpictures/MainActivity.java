@@ -50,7 +50,7 @@ public class MainActivity extends AppCompatActivity implements
         ViewPhotosFragment.OnFragmentInteractionListener {
 
 
-    private static final String LEADERBOARDS = "leaderboardNames";
+    private static final String LEADERBOARDS = "leaderboards";
     private static final String USERS = "users";
     public static final String LEADERBOARD_VIEWS = "Views";
     public static final String LEADERBOARD_ROTATIONS = "Rotations";
@@ -104,30 +104,57 @@ public class MainActivity extends AppCompatActivity implements
         mUsersReference = mDatabase.child(USERS);
         mLeaderboardReference = mDatabase.child(LEADERBOARDS);
 
-        loadLeaderboardData();
+        loadUserData();
 
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
         setupDrawer();
     }
 
+    private void onUserDataLoaded(){
+        setupLeaderboardListener();
+    }
+
     private void onLeaderboardDataLoaded(){
-        if(!(mUserDataLoaded && mLeaderboardDataLoaded)) return;
-
-        if(mSetupComplete){
-            return;
-        } else {
-            mSetupComplete = true;
-            showPhotos();
-        }
-
+        showPhotos();
     }
 
     public UserData getmUserData(){
         return mUserData;
     }
 
-    private void loadLeaderboardData() {
+    private void setupLeaderboardListener(){
+
+        mLeaderboardReference.addValueEventListener(new ValueEventListener() {
+        @Override
+        public void onDataChange(DataSnapshot snapshot) {
+            for(String leaderboardName: leaderboardNames){
+                if (snapshot.child(leaderboardName).exists()) {
+                    HashMap<String,Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
+                    Leaderboard newLeaderboard = new Leaderboard(leaderboardName,map);
+                    mLeaderboardsMap.put(leaderboardName,newLeaderboard);
+                }else{
+                    Log.d("RCD","leaderboard does not exist: " + leaderboardName);
+                    mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(0);  //race conditions, mUserData was still null
+                    Leaderboard newLeaderboard = new Leaderboard(leaderboardName);
+                    mLeaderboardsMap.put(leaderboardName,newLeaderboard);
+                }
+            }
+
+            if(!mLeaderboardDataLoaded){
+                onLeaderboardDataLoaded();
+                mLeaderboardDataLoaded = true;
+            }
+
+        }
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+        }
+    });
+
+    }
+
+    private void loadUserData() {
         mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
@@ -137,8 +164,8 @@ public class MainActivity extends AppCompatActivity implements
                     mUserData = new UserData(map, mGoogleSignInAccount.getId());
                 }else{
                     Log.d("RCD","account does not exist: " + mGoogleSignInAccount.getId());
-                    UserData data = new UserData(mGoogleSignInAccount);
-                    mUsersReference.child(data.uuid).setValue(data);
+                    mUserData = new UserData(mGoogleSignInAccount);
+                    mUsersReference.child(mUserData.uuid).setValue(mUserData);
                     Log.d("RCD","user created");
                 }
 
@@ -149,38 +176,13 @@ public class MainActivity extends AppCompatActivity implements
                 }
 
                 mUserDataLoaded = true;
-                onLeaderboardDataLoaded();
+                onUserDataLoaded();
             }
             @Override
             public void onCancelled(DatabaseError databaseError) {
             }
         });
 
-        mLeaderboardReference.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                mLeaderboardDataLoaded = false;
-                for(String leaderboardName: leaderboardNames){
-                    if (snapshot.child(leaderboardName).exists()) {
-                        HashMap<String,Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
-                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName,map);
-                        mLeaderboardsMap.put(leaderboardName,newLeaderboard);
-                    }else{
-                        Log.d("RCD","leaderboard does not exist: " + leaderboardName);
-                        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(0);
-                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName);
-                        mLeaderboardsMap.put(leaderboardName,newLeaderboard);
-                    }
-                }
-
-                mLeaderboardDataLoaded = true;
-                onLeaderboardDataLoaded();
-
-            }
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });
     }
 
     public UserData getUserDataByUUID(String uuid){
@@ -202,7 +204,6 @@ public class MainActivity extends AppCompatActivity implements
     public void incrementDownloads(){
         incrementScores(LEADERBOARD_DOWNLOADS);
     }
-
     public void incrementScores(String leaderboardName){
         Leaderboard leaderboard = mLeaderboardsMap.get(leaderboardName);
         long score = leaderboard.getScoreByUUID(mUserData.uuid);
@@ -249,7 +250,6 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onFragmentInteraction(Uri uri) {
-
     }
 
     private void onConnected(GoogleSignInAccount acct) {

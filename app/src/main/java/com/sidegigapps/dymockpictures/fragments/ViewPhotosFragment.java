@@ -20,6 +20,7 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.storage.FirebaseStorage;
@@ -34,9 +35,6 @@ import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -44,8 +42,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -98,9 +94,6 @@ public class ViewPhotosFragment extends Fragment {
             mParam2 = getArguments().getString(ARG_PARAM2);
         }
         mStorageRef = FirebaseStorage.getInstance().getReference();
-
-        //loadJSONFromAsset();
-        loadFileNames();
     }
 
     private void loadFileNames() {
@@ -117,7 +110,7 @@ public class ViewPhotosFragment extends Fragment {
                 filename = reader.readLine();
             }
             is.close();
-            loadDownloadLinks();
+            onNewImageRequested();
         } catch (IOException ex) {
             ex.printStackTrace();
             return;
@@ -134,14 +127,10 @@ public class ViewPhotosFragment extends Fragment {
 
     public void onURLsDownloaded(){
         Log.d("RCD","onURLsDownloaded");
-        Log.d("RCD","isLoading is " + String.valueOf(isLoading));
 
-        if(isLoading){
-            targetImage.setVisibility(View.VISIBLE);
-            progressBar.setVisibility(View.INVISIBLE);
-            isLoading = false;
-            fetchNewTargetImage();
-        }
+        //targetImage.setVisibility(View.VISIBLE);
+        progressBar.setVisibility(View.INVISIBLE);
+        displayImage();
     }
 
     @Override
@@ -158,6 +147,9 @@ public class ViewPhotosFragment extends Fragment {
 
         setupFABs();
 
+
+        loadFileNames();
+
         return view;
 
     }
@@ -171,7 +163,7 @@ public class ViewPhotosFragment extends Fragment {
                 int id = v.getId();
                 switch (id) {
                     case R.id.fab_new:
-                        onNewFabPressed();
+                        onNewImageRequested();
                         break;
                     case R.id.fab_save:
                         onSaveFABPressed();
@@ -190,25 +182,7 @@ public class ViewPhotosFragment extends Fragment {
 
     }
 
-    private String getNextURL(){
-        urlMap.remove(targetFilename); //remove old targetFileName from map
-
-        if(queuedFileNames.size()==0){
-            String.valueOf("queuedFileNames was null");
-            return null;
-        }
-
-        targetFilename = queuedFileNames.pop();
-        String url = urlMap.get(targetFilename);
-
-        if(null==url){
-            Log.d("RCD","Tried to find " + targetFilename + " but wasn't there");
-            Log.d("RCD",urlMap.toString());
-        }
-        return url;
-    }
-
-    private void loadDownloadLinks(){
+    private void getNextDownloadLink(){
         if(urlMap.size()>1) return;
         Random random = new Random();
 
@@ -217,23 +191,14 @@ public class ViewPhotosFragment extends Fragment {
         getFirebaseDownloadURL(filename);
     }
 
-    private void fetchNewTargetImage() {
-        Log.d("RCD","fetchNewTargetImage");
-        if (targetImageRotation != 0f) {
-            uploadBitmapToFirebase(targetFilename,targetImageRotation);
-            incrementRotations();  //implies that the previous image was rotated.
-        }
+    private void displayImage() {
+        Log.d("RCD","displayImage");
 
-        targetImageRotation = 0f;
-
-        if (filenames.size() < 1) return;
-
-        targetFilenameURL = getNextURL();
+        //if (filenames.size() < 1) return;
 
         if(targetFilenameURL==null){
             Log.d("RCD","targetFilenameURL was null");
-            isLoading = true;
-            loadDownloadLinks();
+            //getNextDownloadLink();
             return;
         }
 
@@ -242,16 +207,13 @@ public class ViewPhotosFragment extends Fragment {
         GlideApp.with(getActivity().getApplicationContext())
                 .load(targetFilenameURL)
                 .placeholder(R.drawable.progress_animation)
-                .error(R.drawable.thumb1983)
                 .into(targetImage);
 
         targetImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
-        //updateViewedAchievement();
-        loadDownloadLinks();
-
         incrementViews();
     }
+
 
     private void incrementViews() {
         ((MainActivity)getActivity()).incrementViews();
@@ -284,7 +246,6 @@ public class ViewPhotosFragment extends Fragment {
         mListener = null;
     }
 
-
     private void downloadTargetImage() {
         if (getActivity().checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             Log.v("RCD", "Permission is granted");
@@ -301,8 +262,18 @@ public class ViewPhotosFragment extends Fragment {
 
     }
 
-    public void onNewFabPressed() {
-        fetchNewTargetImage();
+    public void onNewImageRequested() {
+        if (targetImageRotation != 0f) {
+            //implies that the previous image was rotated.
+            uploadBitmapToFirebase(targetFilename,targetFilenameURL,targetImageRotation);
+            incrementRotations();
+        }
+        targetImageRotation = 0f;
+        GlideApp.with(getActivity().getApplicationContext())
+                .load(R.drawable.progress_animation)
+                .into(targetImage);
+
+        getNextDownloadLink();
     }
 
     public void onSaveFABPressed() {
@@ -332,14 +303,14 @@ public class ViewPhotosFragment extends Fragment {
         targetImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
     }
 
-    private void uploadBitmapToFirebase(final String filename, final float rotation) {
+    private void uploadBitmapToFirebase(final String filename, final String url, final float rotation) {
 
         ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(getActivity())
                 .build();
         ImageLoader.getInstance().init(config);
         ImageLoader imageLoader = ImageLoader.getInstance();
 
-        imageLoader.loadImage(targetFilenameURL, new SimpleImageLoadingListener() {
+        imageLoader.loadImage(url, new SimpleImageLoadingListener() {
             @Override
             public void onLoadingComplete(String imageUri, View view, Bitmap loadedImage) {
                 RotateTransformation transformation = new RotateTransformation(getActivity(), rotation);
@@ -354,12 +325,12 @@ public class ViewPhotosFragment extends Fragment {
                 uploadTask.addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception exception) {
-                        //Toast.makeText(getActivity(), "Uh oh.  There was a problem.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getActivity(), "Uh oh.  There was a problem.", Toast.LENGTH_SHORT).show();
                     }
                 }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                     @Override
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                        //Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();  //TODO: remove this after testing
                     }
                 });
             }
@@ -372,8 +343,9 @@ public class ViewPhotosFragment extends Fragment {
         mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
             @Override
             public void onSuccess(Uri uri) {
-                urlMap.put(filename,uri.toString());
-                queuedFileNames.add(filename);
+                //urlMap.put(filename,uri.toString());
+                targetFilenameURL = uri.toString();
+                targetFilename = filename;
                 onURLsDownloaded();
             }
         }).addOnFailureListener(new OnFailureListener() {

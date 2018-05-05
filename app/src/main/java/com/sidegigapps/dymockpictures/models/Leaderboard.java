@@ -21,7 +21,7 @@ public class Leaderboard {
         public int compare(Entry<String, Long> e1, Entry<String, Long> e2) {
             long score1 = e1.getValue();
             long score2 = e2.getValue();
-            return (int)(score1 - score2);
+            return (int)(score2 - score1);
         }
     };
 

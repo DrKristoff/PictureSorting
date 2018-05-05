@@ -12,10 +12,6 @@ public class UserData {
     public String uuid;
     public String name;
     public String url;
-    private long rotationsCount;
-    private long viewsCount;
-    private long sortedCount;
-    private long transcribedCount;
 
     public UserData(){
         // Default constructor required for calls to DataSnapshot.getValue(UserData.class)
@@ -61,38 +57,6 @@ public class UserData {
         this.url = url;
     }
 
-    public long getRotationsCount() {
-        return rotationsCount;
-    }
-
-    public void setRotationsCount(int rotationsCount) {
-        this.rotationsCount = rotationsCount;
-    }
-
-    public long getViewsCount() {
-        return viewsCount;
-    }
-
-    public void setViewsCount(int viewsCount) {
-        this.viewsCount = viewsCount;
-    }
-
-    public long getSortedCount() {
-        return sortedCount;
-    }
-
-    public void setSortedCount(int sortedCount) {
-        this.sortedCount = sortedCount;
-    }
-
-    public long getTranscribedCount() {
-        return transcribedCount;
-    }
-
-    public void setTranscribedCount(int transcribedCount) {
-        this.transcribedCount = transcribedCount;
-    }
-
     public UserData(String uuid, String name, String url){
         this.uuid = uuid;
         this.name = name;
@@ -111,10 +75,6 @@ public class UserData {
         result.put("uuid", uuid);
         result.put("name", name);
         result.put("url", uuid);
-        //result.put("rotationsCount", rotationsCount);
-        //result.put("viewsCount", viewsCount);
-        //result.put("sortedCount", sortedCount);
-        //result.put("transcribedCount", transcribedCount);
         return result;
     }
 
