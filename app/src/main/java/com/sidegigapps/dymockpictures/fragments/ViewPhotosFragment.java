@@ -308,6 +308,7 @@ public class ViewPhotosFragment extends Fragment {
     public void onSaveFABPressed() {
         downloadTargetImage();
         Toast.makeText(getActivity(), "Saving Image", Toast.LENGTH_SHORT).show();
+        ((MainActivity)getActivity()).incrementDownloads();
     }
 
     public void onRotateFabPressed() {
@@ -353,12 +354,12 @@ public class ViewPhotosFragment extends Fragment {
                 uploadTask.addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception exception) {
-                        Toast.makeText(getActivity(), "Uh oh.  There was a problem.", Toast.LENGTH_SHORT).show();
+                        //Toast.makeText(getActivity(), "Uh oh.  There was a problem.", Toast.LENGTH_SHORT).show();
                     }
                 }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                     @Override
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                        Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();
+                        //Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();
                     }
                 });
             }

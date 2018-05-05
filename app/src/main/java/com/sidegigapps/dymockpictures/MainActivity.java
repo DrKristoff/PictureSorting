@@ -50,12 +50,13 @@ public class MainActivity extends AppCompatActivity implements
         ViewPhotosFragment.OnFragmentInteractionListener {
 
 
-    private static final String LEADERBOARDS = "leaderboards";
+    private static final String LEADERBOARDS = "leaderboardNames";
     private static final String USERS = "users";
-    private static final String LEADERBOARD_VIEWS = "views";
-    private static final String LEADERBOARD_ROTATIONS = "rotations";
-    private static final String LEADERBOARD_SORTED ="sorted";
-    private static final String LEADERBOARD_TRANSCRIBED = "transcribed";
+    public static final String LEADERBOARD_VIEWS = "Views";
+    public static final String LEADERBOARD_ROTATIONS = "Rotations";
+    public static final String LEADERBOARD_SORTED ="Sorted";
+    public static final String LEADERBOARD_TRANSCRIBED = "Transcribed";
+    public static final String LEADERBOARD_DOWNLOADS = "Downloads";
     private GoogleSignInAccount mGoogleSignInAccount;
     private SharedPreferences prefs;
     private FirebaseAuth mAuth;
@@ -70,16 +71,18 @@ public class MainActivity extends AppCompatActivity implements
     private DatabaseReference mLeaderboardReference;
     private UserData mUserData;
     private HashMap<String,Leaderboard> mLeaderboardsMap = new HashMap<>();
+    private HashMap<String,UserData> mUsersMap = new HashMap<>();
 
     public boolean mUserDataLoaded = false;
     public boolean mLeaderboardDataLoaded = false;
     private boolean mSetupComplete = false;
 
-    final String [] leaderboards = new String []{
-            LEADERBOARD_ROTATIONS,
+    public final String [] leaderboardNames = new String []{
             LEADERBOARD_VIEWS,
-            LEADERBOARD_SORTED,
-            LEADERBOARD_TRANSCRIBED
+            LEADERBOARD_ROTATIONS,
+            //LEADERBOARD_SORTED,
+            //LEADERBOARD_TRANSCRIBED,
+            LEADERBOARD_DOWNLOADS
     };
 
     Drawer drawer;
@@ -120,6 +123,10 @@ public class MainActivity extends AppCompatActivity implements
 
     }
 
+    public UserData getmUserData(){
+        return mUserData;
+    }
+
     private void loadLeaderboardData() {
         mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -135,6 +142,12 @@ public class MainActivity extends AppCompatActivity implements
                     Log.d("RCD","user created");
                 }
 
+                for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                    HashMap<String,Object> childMap = (HashMap<String, Object>) childSnapshot.getValue();
+                    UserData userData = new UserData(childMap);
+                    mUsersMap.put(userData.getUuid(),userData);
+                }
+
                 mUserDataLoaded = true;
                 onLeaderboardDataLoaded();
             }
@@ -147,7 +160,7 @@ public class MainActivity extends AppCompatActivity implements
             @Override
             public void onDataChange(DataSnapshot snapshot) {
                 mLeaderboardDataLoaded = false;
-                for(String leaderboardName: leaderboards){
+                for(String leaderboardName: leaderboardNames){
                     if (snapshot.child(leaderboardName).exists()) {
                         HashMap<String,Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
                         Leaderboard newLeaderboard = new Leaderboard(leaderboardName,map);
@@ -168,7 +181,10 @@ public class MainActivity extends AppCompatActivity implements
             public void onCancelled(DatabaseError databaseError) {
             }
         });
+    }
 
+    public UserData getUserDataByUUID(String uuid){
+        return mUsersMap.get(uuid);
     }
 
     public void incrementRotations(){
@@ -183,16 +199,18 @@ public class MainActivity extends AppCompatActivity implements
     public void incrementTranscribes(){
         incrementScores(LEADERBOARD_TRANSCRIBED);
     }
+    public void incrementDownloads(){
+        incrementScores(LEADERBOARD_DOWNLOADS);
+    }
 
     public void incrementScores(String leaderboardName){
         Leaderboard leaderboard = mLeaderboardsMap.get(leaderboardName);
-        long score = leaderboard.getRotationsByUUID(mUserData.uuid);
+        long score = leaderboard.getScoreByUUID(mUserData.uuid);
         score +=1;
         mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(score);
 
         Log.d("RCD","UPDATING " + leaderboardName);
         Log.d("RCD","NOW " + String.valueOf(score));
-
 
     }
 
@@ -364,6 +382,7 @@ public class MainActivity extends AppCompatActivity implements
         getSupportActionBar().setTitle("Leaderboards");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         leaderboardFragment = new LeaderboardFragment();
+        leaderboardFragment.setLeaderboardData(mLeaderboardsMap);
         ft.replace(R.id.fragment_layout, leaderboardFragment);
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();

@@ -1,5 +1,7 @@
 package com.sidegigapps.dymockpictures.models;
 
+import android.support.annotation.NonNull;
+
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 
 import java.util.HashMap;
@@ -24,13 +26,15 @@ public class UserData {
         HashMap<String,Object> results = (HashMap<String, Object>) map.get(id);
 
         this.uuid = (String) results.get("uuid");
-        //this.rotationsCount = (Long) results.get("rotationsCount");
-        //this.viewsCount = (long) results.get("viewsCount");
-        //this.sortedCount = (long) results.get("sortedCount");
-        //this.transcribedCount = (long) results.get("transcribedCount");
         this.name = (String) results.get("name");
         this.url = (String) results.get("url");
+    }
 
+    public UserData(HashMap<String, Object> map) {
+
+        this.uuid = (String) map.get("uuid");
+        this.name = (String) map.get("name");
+        this.url = (String) map.get("url");
     }
 
     public String getUuid() {
