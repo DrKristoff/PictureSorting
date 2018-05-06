@@ -5,6 +5,8 @@ import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.AsyncTask;
+import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -18,6 +20,8 @@ import android.view.View;
 import android.widget.ImageView;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -26,6 +30,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.StreamDownloadTask;
 import com.mikepenz.iconics.IconicsDrawable;
 import com.mikepenz.materialdrawer.AccountHeader;
 import com.mikepenz.materialdrawer.AccountHeaderBuilder;
@@ -44,7 +49,17 @@ import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
 import com.sidegigapps.dymockpictures.models.UserData;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements
         ViewPhotosFragment.OnFragmentInteractionListener {
@@ -72,6 +87,7 @@ public class MainActivity extends AppCompatActivity implements
     private UserData mUserData;
     private HashMap<String,Leaderboard> mLeaderboardsMap = new HashMap<>();
     private HashMap<String,UserData> mUsersMap = new HashMap<>();
+    private List<String> filenames = new ArrayList<>();
 
     public boolean mUserDataLoaded = false;
     public boolean mLeaderboardDataLoaded = false;
@@ -105,10 +121,32 @@ public class MainActivity extends AppCompatActivity implements
         mLeaderboardReference = mDatabase.child(LEADERBOARDS);
 
         loadUserData();
+        loadImageData();
 
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
         setupDrawer();
+    }
+
+    private void loadImageData() {
+        mDatabase.child("images").child("filenames_url").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                String url = (String)snapshot.getValue();
+
+                loadFilenames(url);
+
+
+            }
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+            }
+        });
+    }
+
+    private void onFileNamesLoaded() {
+        Log.d("RCD","Filenames loaded successfully");
+        Log.d("RCD","There are " + String.valueOf(filenames.size()) + " files");
     }
 
     private void onUserDataLoaded(){
@@ -389,4 +427,47 @@ public class MainActivity extends AppCompatActivity implements
 
     }
 
+    private void loadFilenames(String urlString) {
+
+        StorageReference filenamesRef = mStorageRef.child("filenames.txt");
+
+        final long ONE_MEGABYTE = 1024 * 1024;
+        filenamesRef.getBytes(ONE_MEGABYTE).addOnSuccessListener(new OnSuccessListener<byte[]>() {
+            @Override
+            public void onSuccess(byte[] bytes) {
+                loadFilenamesFromByteString(bytes);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                // Handle any errors
+            }
+        });
+    }
+
+    private void loadFilenamesFromByteString(byte[] bytes){
+        Log.d("RCD","loadFilenamesFromByteString");
+        InputStream is = new ByteArrayInputStream(bytes);
+
+        BufferedReader reader;
+        try {
+            reader = new BufferedReader(new InputStreamReader(is));
+            String filename = reader.readLine();
+            while(filename != null){
+                filenames.add(filename);
+                filename = reader.readLine();
+            }
+            is.close();
+            onFileNamesLoaded();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        } finally {
+            try {
+                if (is != null)
+                    is.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
 }

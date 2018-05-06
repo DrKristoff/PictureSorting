@@ -147,7 +147,6 @@ public class ViewPhotosFragment extends Fragment {
 
         setupFABs();
 
-
         loadFileNames();
 
         return view;
