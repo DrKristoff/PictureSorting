@@ -157,6 +157,7 @@ public class LeaderboardFragment extends Fragment {
         public void onBindViewHolder(ViewHolder holder, int position) {
             String uuid = mLeaderboard.getUUIDByLeaderboardPosition(position);
             UserData userData = ((MainActivity)getActivity()).getUserDataByUUID(uuid);
+            if (userData==null) return;
 
             holder.mNameTextView.setText(userData.getName());
             holder.mRankTextView.setText(String.valueOf(position+1));

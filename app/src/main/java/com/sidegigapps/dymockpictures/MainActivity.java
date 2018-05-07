@@ -87,7 +87,7 @@ public class MainActivity extends AppCompatActivity implements
     private UserData mUserData;
     private HashMap<String,Leaderboard> mLeaderboardsMap = new HashMap<>();
     private HashMap<String,UserData> mUsersMap = new HashMap<>();
-    private List<String> filenames = new ArrayList<>();
+    public List<String> filenames = new ArrayList<>();
 
     public boolean mUserDataLoaded = false;
     public boolean mLeaderboardDataLoaded = false;
@@ -120,7 +120,6 @@ public class MainActivity extends AppCompatActivity implements
         mUsersReference = mDatabase.child(USERS);
         mLeaderboardReference = mDatabase.child(LEADERBOARDS);
 
-        loadUserData();
         loadImageData();
 
         mToolbar = findViewById(R.id.toolbar);
@@ -129,31 +128,34 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void loadImageData() {
-        mDatabase.child("images").child("filenames_url").addValueEventListener(new ValueEventListener() {
+        loadFilenames();
+
+/*        mDatabase.child("images").child("filenames_url").addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
                 String url = (String)snapshot.getValue();
-
                 loadFilenames(url);
-
-
             }
             @Override
             public void onCancelled(DatabaseError databaseError) {
             }
-        });
+        });*/
     }
 
     private void onFileNamesLoaded() {
+        Log.d("RCD","onFileNamesLoaded");
         Log.d("RCD","Filenames loaded successfully");
         Log.d("RCD","There are " + String.valueOf(filenames.size()) + " files");
+        loadUserData();
     }
 
     private void onUserDataLoaded(){
+        Log.d("RCD","onUserDataLoaded");
         setupLeaderboardListener();
     }
 
     private void onLeaderboardDataLoaded(){
+        Log.d("RCD","onLeaderboardDataLoaded");
         showPhotos();
     }
 
@@ -162,6 +164,7 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void setupLeaderboardListener(){
+        Log.d("RCD","setupLeaderboardListener");
 
         mLeaderboardReference.addValueEventListener(new ValueEventListener() {
         @Override
@@ -193,6 +196,7 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void loadUserData() {
+        Log.d("RCD","loadUserData");
         mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
@@ -270,7 +274,7 @@ public class MainActivity extends AppCompatActivity implements
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        MainActivity    .super.onBackPressed();
+                        MainActivity.super.onBackPressed();
                     }
                 }).create().show();
     }
@@ -397,6 +401,7 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void showPhotos(){
+        Log.d("RCD","showPhotos");
         getSupportActionBar().setTitle("Family Picture Sorting");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         viewPhotosFragment = new ViewPhotosFragment();
@@ -427,7 +432,8 @@ public class MainActivity extends AppCompatActivity implements
 
     }
 
-    private void loadFilenames(String urlString) {
+    private void loadFilenames() {
+        Log.d("RCD","loadFilenames");
 
         StorageReference filenamesRef = mStorageRef.child("filenames.txt");
 

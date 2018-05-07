@@ -1,6 +1,7 @@
 package com.sidegigapps.dymockpictures.fragments;
 
 import android.Manifest;
+import android.app.DatePickerDialog;
 import android.app.DownloadManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -16,14 +17,15 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.DatePicker;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import com.bumptech.glide.Glide;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import com.jsibbold.zoomage.ZoomageView;
@@ -35,12 +37,8 @@ import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -51,17 +49,16 @@ public class ViewPhotosFragment extends Fragment {
     private static final int REQUEST_CODE = 1;
     private StorageReference mStorageRef;
     private HashMap<String, String> downloadLinksMap = new HashMap<>();
-    private List<String> filenames = new ArrayList<>();
     private String targetFilenameURL;
     private ZoomageView targetImage;
     private float targetImageRotation = 0f;
     private String targetFilename;
     private FloatingActionButton fab_rotate, fab_new, fab_save;
+    private com.github.clans.fab.FloatingActionButton fab_exact, fab_era, fab_guided;
     private ProgressBar progressBar;
 
     private boolean isLoading = true;
 
-    HashMap<String,String> urlMap = new HashMap<>();
     LinkedList<String> queuedFileNames = new LinkedList<>();
 
     private static final String ARG_PARAM1 = "param1";
@@ -96,37 +93,8 @@ public class ViewPhotosFragment extends Fragment {
         mStorageRef = FirebaseStorage.getInstance().getReference();
     }
 
-    private void loadFileNames() {
-        Log.d("RCD","loadFileNames");
-        String json = null;
-        InputStream is = null;
-        BufferedReader reader;
-        try {
-            is = getActivity().getAssets().open("filenames.txt");
-            reader = new BufferedReader(new InputStreamReader(is));
-            String filename = reader.readLine();
-            while(filename != null){
-                filenames.add(filename);
-                filename = reader.readLine();
-            }
-            is.close();
-            onNewImageRequested();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            return;
-        } finally {
-            try {
-                if (is != null)
-                    is.close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-
-        }
-    }
-
-    public void onURLsDownloaded(){
-        Log.d("RCD","onURLsDownloaded");
+    public void onURLDownloaded(){
+        Log.d("RCD","onURLDownloaded");
 
         //targetImage.setVisibility(View.VISIBLE);
         progressBar.setVisibility(View.INVISIBLE);
@@ -145,9 +113,13 @@ public class ViewPhotosFragment extends Fragment {
         fab_rotate = view.findViewById(R.id.fab_rotate);
         fab_save = view.findViewById(R.id.fab_save);
 
-        setupFABs();
+        fab_exact = view.findViewById(R.id.exact_sort_fab);
+        fab_era = view.findViewById(R.id.era_sort_fab);
+        fab_guided = view.findViewById(R.id.guided_sort_fab);
 
-        loadFileNames();
+
+        setupFABs();
+        onNewImageRequested();
 
         return view;
 
@@ -170,6 +142,15 @@ public class ViewPhotosFragment extends Fragment {
                     case R.id.fab_rotate:
                         onRotateFabPressed();
                         break;
+                    case R.id.exact_sort_fab:
+                        onExactSortPressed();
+                        break;
+                    case R.id.era_sort_fab:
+                        onEraSortPressed();
+                        break;
+                    case R.id.guided_sort_fab:
+                        onGuidedSortPressed();
+                        break;
                 }
 
             }
@@ -179,11 +160,49 @@ public class ViewPhotosFragment extends Fragment {
         fab_rotate.setOnClickListener(fab_listener);
         fab_save.setOnClickListener(fab_listener);
 
+
+        fab_exact.setOnClickListener(fab_listener);
+        fab_era.setOnClickListener(fab_listener);
+        fab_guided.setOnClickListener(fab_listener);
+
+    }
+
+    private void onGuidedSortPressed(){
+        Toast.makeText(getActivity(),"Coming Soon",Toast.LENGTH_SHORT).show();
+
+    }
+
+    private void onEraSortPressed() {
+        EraDialogFragment dialog = new EraDialogFragment();
+        dialog.show(getFragmentManager(),"EraDialogFragment");
+
+    }
+
+    private void onExactSortPressed() {
+        // Get Current Date
+        final Calendar c = Calendar.getInstance();
+        int year = c.get(Calendar.YEAR);
+        int month = c.get(Calendar.MONTH);
+        int day = c.get(Calendar.DAY_OF_MONTH);
+
+        DatePickerDialog datePickerDialog = new DatePickerDialog(getActivity(),
+                new DatePickerDialog.OnDateSetListener() {
+
+                    @Override
+                    public void onDateSet(DatePicker view, int year,
+                                          int monthOfYear, int dayOfMonth) {
+
+                        //txtDate.setText(dayOfMonth + "-" + (monthOfYear + 1) + "-" + year);
+
+                    }
+                }, year, month, day);
+        datePickerDialog.show();
     }
 
     private void getNextDownloadLink(){
-        if(urlMap.size()>1) return;
         Random random = new Random();
+
+        List<String> filenames = ((MainActivity)getActivity()).filenames;
 
         int index = random.nextInt(filenames.size());
         String filename = filenames.get(index);
@@ -193,11 +212,9 @@ public class ViewPhotosFragment extends Fragment {
     private void displayImage() {
         Log.d("RCD","displayImage");
 
-        //if (filenames.size() < 1) return;
 
         if(targetFilenameURL==null){
             Log.d("RCD","targetFilenameURL was null");
-            //getNextDownloadLink();
             return;
         }
 
@@ -207,6 +224,10 @@ public class ViewPhotosFragment extends Fragment {
                 .load(targetFilenameURL)
                 .placeholder(R.drawable.progress_animation)
                 .into(targetImage);
+
+
+        progressBar.setVisibility(View.GONE);
+        targetImage.setVisibility(View.VISIBLE);
 
         targetImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
@@ -248,7 +269,7 @@ public class ViewPhotosFragment extends Fragment {
     private void downloadTargetImage() {
         if (getActivity().checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             Log.v("RCD", "Permission is granted");
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadLinksMap.get(targetFilename)));
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(targetFilenameURL));
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, targetFilename);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
@@ -268,9 +289,11 @@ public class ViewPhotosFragment extends Fragment {
             incrementRotations();
         }
         targetImageRotation = 0f;
-        GlideApp.with(getActivity().getApplicationContext())
+        targetImage.setVisibility(View.INVISIBLE);
+        progressBar.setVisibility(View.VISIBLE);
+/*        GlideApp.with(getActivity().getApplicationContext())
                 .load(R.drawable.progress_animation)
-                .into(targetImage);
+                .into(targetImage);*/
 
         getNextDownloadLink();
     }
@@ -342,16 +365,28 @@ public class ViewPhotosFragment extends Fragment {
         mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
             @Override
             public void onSuccess(Uri uri) {
-                //urlMap.put(filename,uri.toString());
                 targetFilenameURL = uri.toString();
                 targetFilename = filename;
-                onURLsDownloaded();
+                onURLDownloaded();
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
                 Log.d("RCD", "FAILED");
                 Log.d("RCD", exception.getMessage());
+            }
+        });
+
+        mStorageRef.child(filename).getMetadata().addOnSuccessListener(new OnSuccessListener<StorageMetadata>() {
+            @Override
+            public void onSuccess(StorageMetadata storageMetadata) {
+                // Metadata now contains the metadata for 'images/forest.jpg'
+                Log.d("RCD","success");
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                // Uh-oh, an error occurred!
             }
         });
     }

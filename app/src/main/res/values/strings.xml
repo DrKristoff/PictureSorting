@@ -11,4 +11,18 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <string-array name="eras_array">
+
+        <item>(Pre 1982)  The Early Days </item>
+        <item>(1982–1983) Just Mom and Dad</item>
+        <item>(1983–1986) Ryan</item>
+        <item>(1986–1990) R, K</item>
+        <item>(1990–1994) R, K, H</item>
+        <item>(1994–1998) R, K, H, A</item>
+        <item>(1998–2002) R, K, H, A, M</item>
+        <item>(2002–2006) No Ryan</item>
+        <item>(2006–Now) Grandkids Era</item>
+    </string-array>
+
 </resources>
