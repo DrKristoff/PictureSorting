@@ -1,6 +1,8 @@
 package com.sidegigapps.dymockpictures;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -34,6 +36,8 @@ public class SignInActivity extends AppCompatActivity {
     private GoogleSignInClient mGoogleSignInClient;
     GoogleSignInAccount mGoogleSignInAccount;
 
+    private SharedPreferences prefs;
+
     private static final int REQUEST_CODE = 1;
     private static final int RC_SIGN_IN = 9001;
     private static final int RC_FIREBASE_SIGN_IN = 123;
@@ -46,10 +50,11 @@ public class SignInActivity extends AppCompatActivity {
 
         mAuth = FirebaseAuth.getInstance();
 
+        prefs = getSharedPreferences("status",Context.MODE_PRIVATE);
+
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
-                //.requestScopes(Games.SCOPE_GAMES_LITE)
                 .build();
 
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
@@ -73,9 +78,14 @@ public class SignInActivity extends AppCompatActivity {
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
         if (account != null) {
             Log.d("RCD","Previously signed in: " + String.valueOf(account.getDisplayName()));
-            //Intent intent = new Intent(getApplicationContext(),MainActivity.class);
-            //intent.putExtra("ACCOUNT",account);
-            //startActivity(intent);
+            boolean signed_in = prefs.getBoolean("signed_in", false);
+            Log.d("RCD","boolean is now " + String.valueOf(signed_in));
+            if(signed_in){
+                Intent intent = new Intent(getApplicationContext(),MainActivity.class);
+                intent.putExtra("ACCOUNT",account);
+                startActivity(intent);
+            }
+
         }
         //updateUI(currentUser);
     }

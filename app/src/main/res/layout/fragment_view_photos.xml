@@ -85,7 +85,7 @@
             android:layout_height="wrap_content"
             android:src="@drawable/ic_help_24dp"
             fab:fab_size="mini"
-            fab:fab_label="Guided" />
+            fab:fab_label="Guide Me" />
 
     </com.github.clans.fab.FloatingActionMenu>
 

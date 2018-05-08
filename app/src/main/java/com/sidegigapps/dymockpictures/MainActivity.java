@@ -108,7 +108,8 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        prefs = getPreferences(Context.MODE_PRIVATE);
+        prefs = getSharedPreferences("status",Context.MODE_PRIVATE);
+        prefs.edit().putBoolean("signed_in", true).apply();
 
         mGoogleSignInAccount = getIntent().getParcelableExtra("ACCOUNT");
         onConnected(mGoogleSignInAccount);
@@ -130,16 +131,6 @@ public class MainActivity extends AppCompatActivity implements
     private void loadImageData() {
         loadFilenames();
 
-/*        mDatabase.child("images").child("filenames_url").addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                String url = (String)snapshot.getValue();
-                loadFilenames(url);
-            }
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });*/
     }
 
     private void onFileNamesLoaded() {
@@ -274,6 +265,10 @@ public class MainActivity extends AppCompatActivity implements
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
+                        boolean result = prefs.edit().putBoolean("signed_in", false).commit();
+                        Log.d("RCD","boolean was " + String.valueOf(result));
+                        boolean signed_in = prefs.getBoolean("signed_in", false);
+                        Log.d("RCD","boolean is now " + String.valueOf(signed_in));
                         MainActivity.super.onBackPressed();
                     }
                 }).create().show();
