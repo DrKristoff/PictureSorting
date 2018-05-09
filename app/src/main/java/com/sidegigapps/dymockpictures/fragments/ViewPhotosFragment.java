@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 import android.widget.DatePicker;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnFailureListener;
@@ -36,6 +37,7 @@ import com.sidegigapps.dymockpictures.GlideApp;
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
+import com.sidegigapps.dymockpictures.utils.Utils;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Calendar;
@@ -44,7 +46,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
-public class ViewPhotosFragment extends Fragment {
+public class ViewPhotosFragment extends Fragment implements EraDialogFragment.OnEraSelectionListener {
 
     private static final int REQUEST_CODE = 1;
     private StorageReference mStorageRef;
@@ -56,8 +58,10 @@ public class ViewPhotosFragment extends Fragment {
     private FloatingActionButton fab_rotate, fab_new, fab_save;
     private com.github.clans.fab.FloatingActionButton fab_exact, fab_era, fab_guided;
     private ProgressBar progressBar;
+    private TextView dateTextView;
 
     private boolean isLoading = true;
+    private boolean downloadRequested = false;
 
     LinkedList<String> queuedFileNames = new LinkedList<>();
 
@@ -108,6 +112,8 @@ public class ViewPhotosFragment extends Fragment {
 
         targetImage = view.findViewById(R.id.targetImage);
         progressBar = view.findViewById(R.id.indeterminateBar);
+
+        dateTextView = view.findViewById(R.id.dateTextView);
 
         fab_new = view.findViewById(R.id.fab_new);
         fab_rotate = view.findViewById(R.id.fab_rotate);
@@ -266,11 +272,11 @@ public class ViewPhotosFragment extends Fragment {
         mListener = null;
     }
 
-    private void downloadTargetImage() {
+    private void downloadTargetImage(final String filename, final String url) {
         if (getActivity().checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             Log.v("RCD", "Permission is granted");
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(targetFilenameURL));
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, targetFilename);
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
             DownloadManager dm = (DownloadManager) getActivity().getSystemService(getActivity().DOWNLOAD_SERVICE);
@@ -299,7 +305,8 @@ public class ViewPhotosFragment extends Fragment {
     }
 
     public void onSaveFABPressed() {
-        downloadTargetImage();
+        downloadRequested = true;
+        uploadBitmapToFirebase(targetFilename,targetFilenameURL,targetImageRotation);
         Toast.makeText(getActivity(), "Saving Image", Toast.LENGTH_SHORT).show();
         ((MainActivity)getActivity()).incrementDownloads();
     }
@@ -353,6 +360,10 @@ public class ViewPhotosFragment extends Fragment {
                     @Override
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                         Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();  //TODO: remove this after testing
+                        if(downloadRequested){
+                            downloadTargetImage(filename,url);
+                            downloadRequested = false;
+                        }
                     }
                 });
             }
@@ -389,6 +400,26 @@ public class ViewPhotosFragment extends Fragment {
                 // Uh-oh, an error occurred!
             }
         });
+    }
+
+    @Override
+    public void onFinishEditDialog(int selection) {
+        String [] eras = getActivity().getResources().getStringArray(R.array.eras_array);
+        onEraSelected(eras[selection]);
+    }
+
+    private void onEraSelected(String era) {
+        dateTextView.setText(era);
+        ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
+
+    }
+
+    private void onDateSelected(String date) {
+        dateTextView.setText(date);
+        ((MainActivity)getActivity()).updateImageDate(targetFilename,date);
+        String era = Utils.getEraFromDate(date, getActivity());
+        ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
+
     }
 
     public interface OnFragmentInteractionListener {

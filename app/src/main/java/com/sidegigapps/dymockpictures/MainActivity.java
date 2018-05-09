@@ -5,7 +5,6 @@ import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
@@ -30,7 +29,6 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
-import com.google.firebase.storage.StreamDownloadTask;
 import com.mikepenz.iconics.IconicsDrawable;
 import com.mikepenz.materialdrawer.AccountHeader;
 import com.mikepenz.materialdrawer.AccountHeaderBuilder;
@@ -48,15 +46,15 @@ import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
 import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
 import com.sidegigapps.dymockpictures.models.UserData;
+import com.sidegigapps.dymockpictures.utils.Utils;
+
+import org.apache.commons.io.FilenameUtils;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.URL;
-import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -67,9 +65,10 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final String LEADERBOARDS = "leaderboards";
     private static final String USERS = "users";
+    private static final String IMAGES = "images";
     public static final String LEADERBOARD_VIEWS = "Views";
     public static final String LEADERBOARD_ROTATIONS = "Rotations";
-    public static final String LEADERBOARD_SORTED ="Sorted";
+    public static final String LEADERBOARD_SORTED = "Sorted";
     public static final String LEADERBOARD_TRANSCRIBED = "Transcribed";
     public static final String LEADERBOARD_DOWNLOADS = "Downloads";
     private GoogleSignInAccount mGoogleSignInAccount;
@@ -82,18 +81,17 @@ public class MainActivity extends AppCompatActivity implements
     private AchievementsFragment achievementsFragment;
     private StorageReference mStorageRef;
     private DatabaseReference mDatabase;
-    private DatabaseReference mUsersReference;
-    private DatabaseReference mLeaderboardReference;
+    private DatabaseReference mUsersReference, mLeaderboardReference, mImagesReference;
     private UserData mUserData;
-    private HashMap<String,Leaderboard> mLeaderboardsMap = new HashMap<>();
-    private HashMap<String,UserData> mUsersMap = new HashMap<>();
+    private HashMap<String, Leaderboard> mLeaderboardsMap = new HashMap<>();
+    private HashMap<String, UserData> mUsersMap = new HashMap<>();
     public List<String> filenames = new ArrayList<>();
 
     public boolean mUserDataLoaded = false;
     public boolean mLeaderboardDataLoaded = false;
     private boolean mSetupComplete = false;
 
-    public final String [] leaderboardNames = new String []{
+    public final String[] leaderboardNames = new String[]{
             LEADERBOARD_VIEWS,
             LEADERBOARD_ROTATIONS,
             //LEADERBOARD_SORTED,
@@ -108,7 +106,13 @@ public class MainActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        prefs = getSharedPreferences("status",Context.MODE_PRIVATE);
+        //TESTING
+        String eraResult = Utils.getEraFromDate("02-02-1995",this);
+        Log.d("RCD",eraResult);
+        String dateResult = Utils.getDateFromEra(eraResult,this);
+        Log.d("RCD",dateResult);
+
+        prefs = getSharedPreferences("status", Context.MODE_PRIVATE);
         prefs.edit().putBoolean("signed_in", true).apply();
 
         mGoogleSignInAccount = getIntent().getParcelableExtra("ACCOUNT");
@@ -120,6 +124,7 @@ public class MainActivity extends AppCompatActivity implements
 
         mUsersReference = mDatabase.child(USERS);
         mLeaderboardReference = mDatabase.child(LEADERBOARDS);
+        mImagesReference = mDatabase.child(IMAGES);
 
         loadImageData();
 
@@ -134,83 +139,52 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void onFileNamesLoaded() {
-        Log.d("RCD","onFileNamesLoaded");
-        Log.d("RCD","Filenames loaded successfully");
-        Log.d("RCD","There are " + String.valueOf(filenames.size()) + " files");
+        Log.d("RCD", "onFileNamesLoaded");
+        Log.d("RCD", "Filenames loaded successfully");
+        Log.d("RCD", "There are " + String.valueOf(filenames.size()) + " files");
         loadUserData();
     }
 
-    private void onUserDataLoaded(){
-        Log.d("RCD","onUserDataLoaded");
+    private void onUserDataLoaded() {
+        Log.d("RCD", "onUserDataLoaded");
         setupLeaderboardListener();
     }
 
-    private void onLeaderboardDataLoaded(){
-        Log.d("RCD","onLeaderboardDataLoaded");
+    private void onLeaderboardDataLoaded() {
+        Log.d("RCD", "onLeaderboardDataLoaded");
         showPhotos();
     }
 
-    public UserData getmUserData(){
+    public UserData getmUserData() {
         return mUserData;
     }
 
-    private void setupLeaderboardListener(){
-        Log.d("RCD","setupLeaderboardListener");
+    private void setupLeaderboardListener() {
+        Log.d("RCD", "setupLeaderboardListener");
 
         mLeaderboardReference.addValueEventListener(new ValueEventListener() {
-        @Override
-        public void onDataChange(DataSnapshot snapshot) {
-            for(String leaderboardName: leaderboardNames){
-                if (snapshot.child(leaderboardName).exists()) {
-                    HashMap<String,Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
-                    Leaderboard newLeaderboard = new Leaderboard(leaderboardName,map);
-                    mLeaderboardsMap.put(leaderboardName,newLeaderboard);
-                }else{
-                    Log.d("RCD","leaderboard does not exist: " + leaderboardName);
-                    mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(0);  //race conditions, mUserData was still null
-                    Leaderboard newLeaderboard = new Leaderboard(leaderboardName);
-                    mLeaderboardsMap.put(leaderboardName,newLeaderboard);
-                }
-            }
-
-            if(!mLeaderboardDataLoaded){
-                onLeaderboardDataLoaded();
-                mLeaderboardDataLoaded = true;
-            }
-
-        }
-        @Override
-        public void onCancelled(DatabaseError databaseError) {
-        }
-    });
-
-    }
-
-    private void loadUserData() {
-        Log.d("RCD","loadUserData");
-        mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
-                if (snapshot.child(mGoogleSignInAccount.getId()).exists()) {
-                    Log.d("RCD","account already exists: " + mGoogleSignInAccount.getId());
-                    HashMap<String,Object> map = (HashMap<String, Object>) snapshot.getValue();
-                    mUserData = new UserData(map, mGoogleSignInAccount.getId());
-                }else{
-                    Log.d("RCD","account does not exist: " + mGoogleSignInAccount.getId());
-                    mUserData = new UserData(mGoogleSignInAccount);
-                    mUsersReference.child(mUserData.uuid).setValue(mUserData);
-                    Log.d("RCD","user created");
+                for (String leaderboardName : leaderboardNames) {
+                    if (snapshot.child(leaderboardName).exists()) {
+                        HashMap<String, Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
+                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName, map);
+                        mLeaderboardsMap.put(leaderboardName, newLeaderboard);
+                    } else {
+                        Log.d("RCD", "leaderboard does not exist: " + leaderboardName);
+                        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(0);  //race conditions, mUserData was still null
+                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName);
+                        mLeaderboardsMap.put(leaderboardName, newLeaderboard);
+                    }
                 }
 
-                for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                    HashMap<String,Object> childMap = (HashMap<String, Object>) childSnapshot.getValue();
-                    UserData userData = new UserData(childMap);
-                    mUsersMap.put(userData.getUuid(),userData);
+                if (!mLeaderboardDataLoaded) {
+                    onLeaderboardDataLoaded();
+                    mLeaderboardDataLoaded = true;
                 }
 
-                mUserDataLoaded = true;
-                onUserDataLoaded();
             }
+
             @Override
             public void onCancelled(DatabaseError databaseError) {
             }
@@ -218,33 +192,71 @@ public class MainActivity extends AppCompatActivity implements
 
     }
 
-    public UserData getUserDataByUUID(String uuid){
+    private void loadUserData() {
+        Log.d("RCD", "loadUserData");
+        mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                if (snapshot.child(mGoogleSignInAccount.getId()).exists()) {
+                    Log.d("RCD", "account already exists: " + mGoogleSignInAccount.getId());
+                    HashMap<String, Object> map = (HashMap<String, Object>) snapshot.getValue();
+                    mUserData = new UserData(map, mGoogleSignInAccount.getId());
+                } else {
+                    Log.d("RCD", "account does not exist: " + mGoogleSignInAccount.getId());
+                    mUserData = new UserData(mGoogleSignInAccount);
+                    mUsersReference.child(mUserData.uuid).setValue(mUserData);
+                    Log.d("RCD", "user created");
+                }
+
+                for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                    HashMap<String, Object> childMap = (HashMap<String, Object>) childSnapshot.getValue();
+                    UserData userData = new UserData(childMap);
+                    mUsersMap.put(userData.getUuid(), userData);
+                }
+
+                mUserDataLoaded = true;
+                onUserDataLoaded();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+            }
+        });
+
+    }
+
+    public UserData getUserDataByUUID(String uuid) {
         return mUsersMap.get(uuid);
     }
 
-    public void incrementRotations(){
+    public void incrementRotations() {
         incrementScores(LEADERBOARD_ROTATIONS);
     }
-    public void incrementViews(){
+
+    public void incrementViews() {
         incrementScores(LEADERBOARD_VIEWS);
     }
-    public void incrementSorts(){
+
+    public void incrementSorts() {
         incrementScores(LEADERBOARD_SORTED);
     }
-    public void incrementTranscribes(){
+
+    public void incrementTranscribes() {
         incrementScores(LEADERBOARD_TRANSCRIBED);
     }
-    public void incrementDownloads(){
+
+    public void incrementDownloads() {
         incrementScores(LEADERBOARD_DOWNLOADS);
     }
-    public void incrementScores(String leaderboardName){
+
+    public void incrementScores(String leaderboardName) {
         Leaderboard leaderboard = mLeaderboardsMap.get(leaderboardName);
         long score = leaderboard.getScoreByUUID(mUserData.uuid);
-        score +=1;
+        score += 1;
         mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(score);
 
-        Log.d("RCD","UPDATING " + leaderboardName);
-        Log.d("RCD","NOW " + String.valueOf(score));
+        Log.d("RCD", "UPDATING " + leaderboardName);
+        Log.d("RCD", "NOW " + String.valueOf(score));
 
     }
 
@@ -266,9 +278,6 @@ public class MainActivity extends AppCompatActivity implements
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         boolean result = prefs.edit().putBoolean("signed_in", false).commit();
-                        Log.d("RCD","boolean was " + String.valueOf(result));
-                        boolean signed_in = prefs.getBoolean("signed_in", false);
-                        Log.d("RCD","boolean is now " + String.valueOf(signed_in));
                         MainActivity.super.onBackPressed();
                     }
                 }).create().show();
@@ -279,10 +288,46 @@ public class MainActivity extends AppCompatActivity implements
         switch (item.getItemId()) {
             case R.id.sign_out:
                 onBackPressed();
+                break;
+
+            case R.id.show_about:
+                showHelpDialog();
+                break;
+
+/*            case R.id.show_help:
+                boolean checked = prefs.getBoolean("show_labels",false);
+                if(checked){
+                    item.setChecked(false);
+                    displayFabLabels(false);
+                    prefs.edit().putBoolean("show_labels",false).commit();
+                } else{
+                    item.setChecked(true);
+                    prefs.edit().putBoolean("show_labels",true).commit();
+                    displayFabLabels(true);
+                }
+                break;*/
 
             default:
                 return super.onOptionsItemSelected(item);
         }
+        return false;
+    }
+
+    private void displayFabLabels(boolean b) {
+    }
+
+
+    private void showHelpDialog() {
+        AlertDialog.Builder builder;
+        builder = new AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert);
+        builder.setTitle("So What's the Point?")
+                .setMessage(getResources().getString(R.string.help_message))
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                    }
+                })
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .show();
     }
 
     @Override
@@ -470,5 +515,15 @@ public class MainActivity extends AppCompatActivity implements
                 ex.printStackTrace();
             }
         }
+    }
+
+    public void updateImageEra(String filename, String era) {
+        String name = FilenameUtils.removeExtension(filename);
+        mImagesReference.child(name).child("era").setValue(era);
+    }
+
+    public void updateImageDate(String filename, String date) {
+        String name = FilenameUtils.removeExtension(filename);
+        mImagesReference.child(name).child("date").setValue(date);
     }
 }

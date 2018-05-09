@@ -77,9 +77,7 @@ public class SignInActivity extends AppCompatActivity {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
         if (account != null) {
-            Log.d("RCD","Previously signed in: " + String.valueOf(account.getDisplayName()));
             boolean signed_in = prefs.getBoolean("signed_in", false);
-            Log.d("RCD","boolean is now " + String.valueOf(signed_in));
             if(signed_in){
                 Intent intent = new Intent(getApplicationContext(),MainActivity.class);
                 intent.putExtra("ACCOUNT",account);
