@@ -1,5 +1,6 @@
 package com.sidegigapps.dymockpictures;
 
+import android.app.DialogFragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
@@ -43,10 +44,9 @@ import com.mikepenz.materialdrawer.util.DrawerImageLoader;
 import com.mikepenz.materialdrawer.util.DrawerUIUtils;
 import com.sidegigapps.dymockpictures.fragments.AchievementsFragment;
 import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
-import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
+import com.sidegigapps.dymockpictures.fragments.SortPhotosFragment;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
 import com.sidegigapps.dymockpictures.models.UserData;
-import com.sidegigapps.dymockpictures.utils.Utils;
 
 import org.apache.commons.io.FilenameUtils;
 
@@ -58,9 +58,10 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements
-        ViewPhotosFragment.OnFragmentInteractionListener {
+        SortPhotosFragment.OnFragmentInteractionListener{
 
 
     private static final String LEADERBOARDS = "leaderboards";
@@ -76,7 +77,7 @@ public class MainActivity extends AppCompatActivity implements
     private FirebaseAuth mAuth;
     private static final String TAG = "RCD";
     private Toolbar mToolbar;
-    private ViewPhotosFragment viewPhotosFragment;
+    private SortPhotosFragment sortPhotosFragment;
     private LeaderboardFragment leaderboardFragment;
     private AchievementsFragment achievementsFragment;
     private StorageReference mStorageRef;
@@ -94,23 +95,19 @@ public class MainActivity extends AppCompatActivity implements
     public final String[] leaderboardNames = new String[]{
             LEADERBOARD_VIEWS,
             LEADERBOARD_ROTATIONS,
-            //LEADERBOARD_SORTED,
+            LEADERBOARD_SORTED,
             //LEADERBOARD_TRANSCRIBED,
             LEADERBOARD_DOWNLOADS
     };
 
     Drawer drawer;
+    private HashMap<Integer,String> anchorMap = new HashMap<>();
+    private HashMap<String,String> anchorUrlMap = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        //TESTING
-        String eraResult = Utils.getEraFromDate("02-02-1995",this);
-        Log.d("RCD",eraResult);
-        String dateResult = Utils.getDateFromEra(eraResult,this);
-        Log.d("RCD",dateResult);
 
         prefs = getSharedPreferences("status", Context.MODE_PRIVATE);
         prefs.edit().putBoolean("signed_in", true).apply();
@@ -143,7 +140,55 @@ public class MainActivity extends AppCompatActivity implements
         Log.d("RCD", "Filenames loaded successfully");
         Log.d("RCD", "There are " + String.valueOf(filenames.size()) + " files");
         loadUserData();
+        loadAnchorData();
     }
+
+    private void loadAnchorData() {
+        Log.d("RCD", "loadAnchorData");
+        DatabaseReference reference = mDatabase.child("images").child("anchors");
+        reference.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                ArrayList<String> anchorsList = (ArrayList<String>)snapshot.getValue();
+                for (int i = 0; i < anchorsList.size(); i ++) {
+                    String anchor = anchorsList.get(i);
+                    anchorMap.put(i,anchor);
+                }
+
+                fetchAnchorDownloadURLs();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+            }
+        });
+
+
+
+
+    }
+
+    private void fetchAnchorDownloadURLs() {
+        for(Map.Entry<Integer,String> entry : anchorMap.entrySet()){
+            final String filename = entry.getValue();
+
+            mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                @Override
+                public void onSuccess(Uri uri) {
+                    String url = uri.toString();
+                    anchorUrlMap.put(filename,url);
+                    Log.d("ANCHOR","filename: " + filename);
+                    Log.d("ANCHOR","URL: " + url);
+                }
+            });
+        }
+    }
+
+
+
+
+
+
 
     private void onUserDataLoaded() {
         Log.d("RCD", "onUserDataLoaded");
@@ -191,6 +236,8 @@ public class MainActivity extends AppCompatActivity implements
         });
 
     }
+
+
 
     private void loadUserData() {
         Log.d("RCD", "loadUserData");
@@ -400,7 +447,7 @@ public class MainActivity extends AppCompatActivity implements
                 .build();
 
         PrimaryDrawerItem viewPhotosItem = new PrimaryDrawerItem()
-                .withName("View Photos");
+                .withName("Sort Photos");
         viewPhotosItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
             public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
@@ -444,9 +491,9 @@ public class MainActivity extends AppCompatActivity implements
         Log.d("RCD","showPhotos");
         getSupportActionBar().setTitle("Family Picture Sorting");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-        viewPhotosFragment = new ViewPhotosFragment();
+        sortPhotosFragment = new SortPhotosFragment();
 
-        ft.replace(R.id.fragment_layout, viewPhotosFragment);
+        ft.replace(R.id.fragment_layout, sortPhotosFragment);
 
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();
@@ -526,4 +573,33 @@ public class MainActivity extends AppCompatActivity implements
         String name = FilenameUtils.removeExtension(filename);
         mImagesReference.child(name).child("date").setValue(date);
     }
+
+    public void fetchEra(String targetFilename) {
+        String formatted = FilenameUtils.removeExtension(targetFilename);
+        mImagesReference.child(formatted).child("era").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                Log.d("RCD",snapshot.toString());
+                if(snapshot.getValue()!=null){
+                    sortPhotosFragment.onEraReceivedFromFirebase((String)snapshot.getValue());
+                } else {
+                    sortPhotosFragment.onEraReceivedFromFirebase("Unknown Era");
+                }
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+            }
+        });
+    }
+
+    public HashMap<Integer,String> getAnchorMap() {
+        return anchorMap;
+    }
+
+    public HashMap<String,String> getAnchorUrlMap() {
+        return anchorUrlMap;
+    }
+
 }

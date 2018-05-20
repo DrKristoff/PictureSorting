@@ -13,6 +13,16 @@ public class EraDialogFragment extends DialogFragment {
     String[] eras;
     int selection = 0;
 
+    private EraDialogListener listener;
+
+    public interface EraDialogListener {
+        void onEraSelected(DialogFragment dialog);
+    }
+
+    public interface OnItemSelectedListener {
+        void onItemSelected(EraDialogFragment fragment, int index);
+    }
+
     public static final String SELECTED = "selected";
 
     @Override
@@ -50,6 +60,7 @@ public class EraDialogFragment extends DialogFragment {
             // process
             //which means position
             selection = which;
+            //onEraSelected(which);
             dialog.dismiss();
         }
 

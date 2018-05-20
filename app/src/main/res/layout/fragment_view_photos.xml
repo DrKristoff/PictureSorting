@@ -48,6 +48,32 @@
         app:zoomage_translatable="true"
         app:zoomage_zoomable="true" />
 
+    <FrameLayout
+        android:id="@+id/guideFrameLayout"
+        android:layout_width="match_parent"
+        android:visibility="invisible"
+        android:layout_height="match_parent"
+        android:elevation="60dp"
+        android:background="@color/md_white_1000"
+        android:layout_marginBottom="5dp"
+        android:layout_marginTop="?android:attr/actionBarSize"
+        android:paddingTop="20dp"
+        android:layout_marginLeft="5dp"
+        android:layout_marginRight="5dp">
+
+        <include layout="@layout/date_selection_guide_layout"/>
+
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/blackBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:elevation="50dp"
+        android:visibility="invisible"
+        android:alpha=".6"
+        android:background="@color/md_black_1000"></FrameLayout>
+
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/fab_save"
         android:layout_width="56dp"
@@ -87,7 +113,20 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintRight_toRightOf="parent" />
 
-    <com.github.clans.fab.FloatingActionMenu
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/fab_exact"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="end|bottom"
+        android:layout_margin="16dp"
+        android:scaleType="center"
+        android:src="@drawable/ic_date_24dp"
+        android:visibility="visible"
+        app:backgroundTint="@color/colorPrimary"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/fab_save" />
+
+   <!-- <com.github.clans.fab.FloatingActionMenu
         android:id="@+id/fab_sort"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -131,7 +170,19 @@
             fab:fab_label="Guide Me"
             fab:fab_size="mini" />
 
-    </com.github.clans.fab.FloatingActionMenu>
+    </com.github.clans.fab.FloatingActionMenu>-->
+
+
+    <ImageView
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:src="@drawable/ic_edit_24dp"
+        app:layout_constraintEnd_toEndOf="@id/dateTextView"
+        android:layout_marginRight="5dp"
+        android:layout_marginTop="5dp"
+        android:elevation="5dp"
+        app:layout_constraintTop_toTopOf="@id/dateTextView"
+        />
 
     <TextView
         android:id="@+id/dateTextView"
@@ -141,14 +192,17 @@
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:layout_marginTop="16dp"
-        android:padding="5dp"
-        android:text="DATE:  Unknown"
+        android:padding="12dp"
+        android:text="Era Unknown"
         android:background="@color/md_white_1000"
-        android:elevation="5dp"
+        android:elevation="2dp"
 
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar" />
+
+
+
 
 
 </android.support.constraint.ConstraintLayout>

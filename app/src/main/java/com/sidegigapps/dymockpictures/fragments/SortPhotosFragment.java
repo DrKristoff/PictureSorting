@@ -1,9 +1,12 @@
 package com.sidegigapps.dymockpictures.fragments;
 
 import android.Manifest;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.app.DatePickerDialog;
 import android.app.DownloadManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -13,11 +16,14 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.DatePicker;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -36,50 +42,48 @@ import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListene
 import com.sidegigapps.dymockpictures.GlideApp;
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
+import com.sidegigapps.dymockpictures.models.GuidedSelectionHelper;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
-import com.sidegigapps.dymockpictures.utils.Utils;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Calendar;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 
-public class ViewPhotosFragment extends Fragment implements EraDialogFragment.OnEraSelectionListener {
+public class SortPhotosFragment extends Fragment implements
+        EraDialogFragment.OnEraSelectionListener {
 
     private static final int REQUEST_CODE = 1;
     private StorageReference mStorageRef;
-    private HashMap<String, String> downloadLinksMap = new HashMap<>();
     private String targetFilenameURL;
     private ZoomageView targetImage;
     private float targetImageRotation = 0f;
     private String targetFilename;
-    private FloatingActionButton fab_rotate, fab_new, fab_save;
-    private com.github.clans.fab.FloatingActionButton fab_exact, fab_era, fab_guided;
+    private FloatingActionButton fab_rotate, fab_new, fab_save, fab_exact;
     private ProgressBar progressBar;
-    private TextView dateTextView;
+    private TextView eraTextView;
 
-    private boolean isLoading = true;
+    GuidedSelectionHelper guideHelper;
+
     private boolean downloadRequested = false;
-
-    LinkedList<String> queuedFileNames = new LinkedList<>();
 
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
 
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
-
     private OnFragmentInteractionListener mListener;
+    private FrameLayout bkg, guideLayout;
+    private Button cancelButton, noButton, sameButton, yesButton;
+    private ZoomageView guideTarget, guideComparison;
+    private HashMap<String, String> anchorUrlMap = new HashMap<>();
 
-    public ViewPhotosFragment() {
+    public SortPhotosFragment() {
         // Required empty public constructor
     }
 
-    public static ViewPhotosFragment newInstance(String param1, String param2) {
-        ViewPhotosFragment fragment = new ViewPhotosFragment();
+    public static SortPhotosFragment newInstance(String param1, String param2) {
+        SortPhotosFragment fragment = new SortPhotosFragment();
         Bundle args = new Bundle();
         args.putString(ARG_PARAM1, param1);
         args.putString(ARG_PARAM2, param2);
@@ -91,16 +95,22 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
+            //mParam1 = getArguments().getString(ARG_PARAM1);
+            //mParam2 = getArguments().getString(ARG_PARAM2);
         }
         mStorageRef = FirebaseStorage.getInstance().getReference();
+        guideHelper = new GuidedSelectionHelper(
+                ((MainActivity)getActivity()).getAnchorMap(),
+                getActivity().getResources().getStringArray(R.array.eras_array),
+                getActivity().getResources().getStringArray(R.array.era_dates_array)
+        );
+
+        anchorUrlMap = ((MainActivity)getActivity()).getAnchorUrlMap();
     }
 
     public void onURLDownloaded(){
         Log.d("RCD","onURLDownloaded");
 
-        //targetImage.setVisibility(View.VISIBLE);
         progressBar.setVisibility(View.INVISIBLE);
         displayImage();
     }
@@ -110,27 +120,99 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_view_photos, container, false);
 
-        targetImage = view.findViewById(R.id.targetImage);
-        progressBar = view.findViewById(R.id.indeterminateBar);
-
-        dateTextView = view.findViewById(R.id.dateTextView);
-
-        fab_new = view.findViewById(R.id.fab_new);
-        fab_rotate = view.findViewById(R.id.fab_rotate);
-        fab_save = view.findViewById(R.id.fab_save);
-
-        fab_exact = view.findViewById(R.id.exact_sort_fab);
-        fab_era = view.findViewById(R.id.era_sort_fab);
-        fab_guided = view.findViewById(R.id.guided_sort_fab);
-
-
-        setupFABs();
+        setupUI(view);
         onNewImageRequested();
 
         return view;
 
     }
 
+    private void setupUI(View view){
+        targetImage = view.findViewById(R.id.targetImage);
+        progressBar = view.findViewById(R.id.indeterminateBar);
+
+        eraTextView = view.findViewById(R.id.dateTextView);
+
+        fab_new = view.findViewById(R.id.fab_new);
+        fab_rotate = view.findViewById(R.id.fab_rotate);
+        fab_save = view.findViewById(R.id.fab_save);
+        fab_exact = view.findViewById(R.id.fab_exact);
+
+        bkg = view.findViewById(R.id.blackBackground);
+        guideLayout = view.findViewById(R.id.guideFrameLayout);
+        cancelButton = view.findViewById(R.id.cancelButton);
+        yesButton = view.findViewById(R.id.yesButton);
+        noButton = view.findViewById(R.id.noButton);
+        sameButton = view.findViewById(R.id.sameButton);
+        guideTarget = view.findViewById(R.id.guidedTargetImage);
+        guideComparison = view.findViewById(R.id.guidedComparisonImage);
+
+        View.OnClickListener guideListener = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                switch(v.getId()){
+                    case R.id.noButton:
+                        guideHelper.makeComparison(GuidedSelectionHelper.OLDER);
+                        updateGuideUI();
+                        break;
+                    case R.id.yesButton:
+                        guideHelper.makeComparison(GuidedSelectionHelper.NEWER);
+                        updateGuideUI();
+                        break;
+                    case R.id.cancelButton:
+                        hideGuideDialog();
+                        guideHelper.reset();
+                        break;
+                    case R.id.sameButton:
+                        String date = guideHelper.getDate();
+                        onDateSelected(date);
+                        hideGuideDialog();
+                        guideHelper.reset();
+                        break;
+                }
+            }
+        };
+
+        cancelButton.setOnClickListener(guideListener);
+        noButton.setOnClickListener(guideListener);
+        guideTarget.setOnClickListener(guideListener);
+        guideComparison.setOnClickListener(guideListener);
+        yesButton.setOnClickListener(guideListener);
+        sameButton.setOnClickListener(guideListener);
+        yesButton.setOnClickListener(guideListener);
+
+
+        eraTextView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onEraSortPressed();
+            }
+        });
+
+        setupFABs();
+
+    }
+
+    private void updateGuideUI() {
+        if(guideHelper.isFinished()){
+            String date = guideHelper.getDate();
+            onDateSelected(date);
+            guideHelper.reset();
+            hideGuideDialog();
+        } else {
+            String comparisonFilename = guideHelper.getComparisonFilename();
+            String comparisonURL = anchorUrlMap.get(comparisonFilename);
+
+            GlideApp.with(getActivity().getApplicationContext())
+                    .load(comparisonURL)
+                    .placeholder(R.drawable.progress_animation)
+                    .into(guideComparison);
+
+            guideComparison.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+        }
+
+    }
 
     private void setupFABs() {
 
@@ -148,7 +230,10 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
                     case R.id.fab_rotate:
                         onRotateFabPressed();
                         break;
-                    case R.id.exact_sort_fab:
+                    case R.id.fab_exact:
+                        onExactSortPressed();
+                        break;
+/*                    case R.id.exact_sort_fab:
                         onExactSortPressed();
                         break;
                     case R.id.era_sort_fab:
@@ -156,7 +241,7 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
                         break;
                     case R.id.guided_sort_fab:
                         onGuidedSortPressed();
-                        break;
+                        break;*/
                 }
 
             }
@@ -165,23 +250,111 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
         fab_new.setOnClickListener(fab_listener);
         fab_rotate.setOnClickListener(fab_listener);
         fab_save.setOnClickListener(fab_listener);
-
-
         fab_exact.setOnClickListener(fab_listener);
-        fab_era.setOnClickListener(fab_listener);
-        fab_guided.setOnClickListener(fab_listener);
+
+
+        //fab_exact.setOnClickListener(fab_listener);
+        //fab_era.setOnClickListener(fab_listener);
+        //fab_guided.setOnClickListener(fab_listener);
 
     }
 
     private void onGuidedSortPressed(){
-        Toast.makeText(getActivity(),"Coming Soon",Toast.LENGTH_SHORT).show();
+        guideHelper.setFilename(targetFilename);
+        showGuideDialog();
+        HashMap<Integer,String> anchorMap = ((MainActivity)getActivity()).getAnchorMap();
+    }
+
+    private void showGuideDialog(){
+        GlideApp.with(getActivity().getApplicationContext())
+                .load(targetFilenameURL)
+                .placeholder(R.drawable.progress_animation)
+                .transform(new RotateTransformation(getActivity(), targetImageRotation))
+                .into(guideTarget);
+
+
+        guideTarget.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+
+        bkg.setVisibility(View.VISIBLE);
+
+        bkg.animate()
+                .alpha(1.0f)
+                .setDuration(100)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        bkg.setVisibility(View.VISIBLE);
+                    }
+                });
+
+        guideLayout.setVisibility(View.VISIBLE);
+        guideLayout.animate()
+                .alpha(1.0f)
+                .setDuration(500)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        guideLayout.setVisibility(View.VISIBLE);
+                    }
+                });
+
+    }
+
+    private void hideGuideDialog(){
+        bkg.animate()
+                .alpha(0.0f)
+                .setDuration(300)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        bkg.setVisibility(View.INVISIBLE);
+                    }
+                });
+
+        guideLayout.animate()
+                .alpha(0.0f)
+                .setDuration(300)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        guideLayout.setVisibility(View.INVISIBLE);
+                    }
+                });
 
     }
 
     private void onEraSortPressed() {
-        EraDialogFragment dialog = new EraDialogFragment();
-        dialog.show(getFragmentManager(),"EraDialogFragment");
+        final String[] eraStrings = getActivity().getResources().getStringArray(R.array.eras_array);
+        new AlertDialog.Builder(getActivity())
+                .setSingleChoiceItems(eraStrings, 0, null)
+                .setPositiveButton(R.string.ok_button_label, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        int selectedPosition = ((AlertDialog)dialog).getListView().getCheckedItemPosition();
+                        onEraSelected(eraStrings[selectedPosition]);
+                        dialog.dismiss();
+                    }
+                })
+                .setNeutralButton(R.string.help_button,new DialogInterface.OnClickListener(){
 
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        onGuidedSortPressed();
+                    }
+                })
+                .setNegativeButton(R.string.cancel,new DialogInterface.OnClickListener(){
+
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .show();
     }
 
     private void onExactSortPressed() {
@@ -197,9 +370,14 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
                     @Override
                     public void onDateSet(DatePicker view, int year,
                                           int monthOfYear, int dayOfMonth) {
+                        String formattedMonth = String.format(Locale.US,"%02d", (monthOfYear+1));
+                        String formattedDay = String.format(Locale.US,"%02d", (dayOfMonth+1));
+                        String formattedYear = String.valueOf(year);
 
-                        //txtDate.setText(dayOfMonth + "-" + (monthOfYear + 1) + "-" + year);
+                        String result = formattedMonth + "-" + formattedDay + "-" + formattedYear;
 
+                        Log.d("RCD",result);
+                        onDateSelected(result);
                     }
                 }, year, month, day);
         datePickerDialog.show();
@@ -240,7 +418,6 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
         incrementViews();
     }
 
-
     private void incrementViews() {
         ((MainActivity)getActivity()).incrementViews();
     }
@@ -275,6 +452,9 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
     private void downloadTargetImage(final String filename, final String url) {
         if (getActivity().checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             Log.v("RCD", "Permission is granted");
+            Log.v("RCD", "Attemping download of " +url);
+
+
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
@@ -285,7 +465,6 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
         } else {
             ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CODE);
         }
-
     }
 
     public void onNewImageRequested() {
@@ -297,9 +476,7 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
         targetImageRotation = 0f;
         targetImage.setVisibility(View.INVISIBLE);
         progressBar.setVisibility(View.VISIBLE);
-/*        GlideApp.with(getActivity().getApplicationContext())
-                .load(R.drawable.progress_animation)
-                .into(targetImage);*/
+        eraTextView.setText("Loading");
 
         getNextDownloadLink();
     }
@@ -307,6 +484,7 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
     public void onSaveFABPressed() {
         downloadRequested = true;
         uploadBitmapToFirebase(targetFilename,targetFilenameURL,targetImageRotation);
+        targetImageRotation = 0f;
         Toast.makeText(getActivity(), "Saving Image", Toast.LENGTH_SHORT).show();
         ((MainActivity)getActivity()).incrementDownloads();
     }
@@ -316,7 +494,6 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
         if (targetImageRotation < 0)
             targetImageRotation = targetImageRotation + 360;
         rotateTargetImage();
-        Toast.makeText(getActivity(), "Rotated Left", Toast.LENGTH_SHORT).show();
 
     }
 
@@ -359,17 +536,14 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
                 }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                     @Override
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                        Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();  //TODO: remove this after testing
+                        //Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();  //TODO: remove this after testing
                         if(downloadRequested){
-                            downloadTargetImage(filename,url);
-                            downloadRequested = false;
-                        }
+                            getFirebaseDownloadURL(filename);
+                     }
                     }
                 });
             }
         });
-
-
     }
 
     private void getFirebaseDownloadURL(final String filename) {
@@ -377,14 +551,21 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
             @Override
             public void onSuccess(Uri uri) {
                 targetFilenameURL = uri.toString();
+                Log.d("download","getFirebaseDownloadURL:");
+                Log.d("download",targetFilenameURL);
                 targetFilename = filename;
+                getEraFromFireBase(targetFilename);
                 onURLDownloaded();
+                if(downloadRequested){
+                    downloadTargetImage(filename,targetFilenameURL);
+                    downloadRequested = false;
+                }
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
-                Log.d("RCD", "FAILED");
-                Log.d("RCD", exception.getMessage());
+                Log.d("download", "FAILED");
+                Log.d("download", exception.getMessage());
             }
         });
 
@@ -402,6 +583,15 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
         });
     }
 
+    private void getEraFromFireBase(String targetFilename) {
+        ((MainActivity)getActivity()).fetchEra(targetFilename);
+
+    }
+
+    public void onEraReceivedFromFirebase(String era){
+        eraTextView.setText(era);
+    }
+
     @Override
     public void onFinishEditDialog(int selection) {
         String [] eras = getActivity().getResources().getStringArray(R.array.eras_array);
@@ -409,20 +599,66 @@ public class ViewPhotosFragment extends Fragment implements EraDialogFragment.On
     }
 
     private void onEraSelected(String era) {
-        dateTextView.setText(era);
+        ((MainActivity)getActivity()).incrementSorts();
+        String date = getDateFromEra(era,getActivity());
+        eraTextView.setText(era);
+        ((MainActivity)getActivity()).updateImageDate(targetFilename,date);
         ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
 
     }
 
-    private void onDateSelected(String date) {
-        dateTextView.setText(date);
+    private void onDateSelected(String date){
+        String era = getEraFromDate(date);
+        eraTextView.setText(era);
         ((MainActivity)getActivity()).updateImageDate(targetFilename,date);
-        String era = Utils.getEraFromDate(date, getActivity());
         ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
-
     }
 
     public interface OnFragmentInteractionListener {
         void onFragmentInteraction(Uri uri);
+    }
+
+    public String getEraFromDate(String date) {
+        //"mm/dd/yyyy" > "Era Name"
+
+        int numericalDate = convertDateToInt(date);
+
+        Log.d("RCD","Finding ERA from " + date);
+        String [] era_dates = getActivity().getResources().getStringArray(R.array.era_dates_array);
+        String [] era_strings = getActivity().getResources().getStringArray(R.array.eras_array);
+
+        int chosen_era_index = 0;
+
+        for(int i = 0; i<era_dates.length;i++) {
+            int compareDate = convertDateToInt(era_dates[i]);
+            if (compareDate < numericalDate) {
+                chosen_era_index = i;
+            }
+        }
+
+        Log.d("RCD","FOUND " + era_strings[chosen_era_index]);
+        return era_strings[chosen_era_index];
+    }
+
+    public int convertDateToInt(String date){
+        Log.d("RCD","attempting conversion of " + date);
+        String[] dateParts = date.split("-");
+        return Integer.parseInt(dateParts[2])*10000 +
+                Integer.parseInt(dateParts[0])*100 +
+                Integer.parseInt(dateParts[1]);
+    }
+
+    public String getDateFromEra(String era, Context context){
+        String [] era_dates = context.getResources().getStringArray(R.array.era_dates_array);
+        String [] era_strings = context.getResources().getStringArray(R.array.eras_array);
+
+        for(int i=0;i<era_dates.length;i++){
+            if(era.equals(era_strings[i])){
+                return era_dates[i];
+            }
+        }
+
+        return era_dates[0];
+
     }
 }

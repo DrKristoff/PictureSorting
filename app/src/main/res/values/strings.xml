@@ -14,20 +14,27 @@
     <string name="show_help">Why the App?</string>
     <string name="help_message">The purpose of this app is to sort all our family pictures!  The first step is organize them roughly by date, which we have defined as eras.  Then they will be imported into Google Photos.  Google Photos will automatically perform the facial recognition, object tagging, and scene tagging for us.  All we have to worry about is when the pictures were taken!  Thanks for helping us organize our family pictures!</string>
     <string name="show_help_labels">Show Help Labels</string>
+    <string name="ok_button_label">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="help_button">Guided</string>
+    <string name="accept">Accept</string>
 
     <string-array name="eras_array">
-        <item>(Pre 1983) The Early Days</item> <!-- 0 -->
-        <item>(1983–1986) Ryan </item><!-- 1 -->
-        <item>(1986–1990) R, K</item>
-        <item>(1990–1994) R, K, H</item>
-        <item>(1994–1998) R, K, H, A</item>
-        <item>(1998–2002) R, K, H, A, M</item>
-        <item>(2002–2006) No Ryan</item>
+        <item>(?) Unknown</item>
+        <item>(Pre 1983) The Early Days</item>
+        <item>(1983–1986) Ryan Era</item>
+        <item>(1986–1990) Kellianne Era</item>
+        <item>(1990–1994) Heidi Era</item>
+        <item>(1994–1998) Amy Era</item>
+        <item>(1998–2002) Matthew Era</item>
+        <item>(2002–2006) No Ryan Era</item>
         <item>(2006–Now) Grandkids Era</item>
+        <item>DELETE</item>
     </string-array>
 
     <string-array name="era_dates_array">
-        <item>01-01-1980</item>
+        <item>01-01-1930</item>
+        <item>01-01-1960</item>
         <item>07-05-1983</item>
         <item>05-15-1986</item>
         <item>10-18-1990</item>
@@ -35,6 +42,7 @@
         <item>07-20-1998</item>
         <item>08-07-2002</item>
         <item>11-18-2006</item>
+        <item>11-18-2020</item>
     </string-array>
 
 </resources>
