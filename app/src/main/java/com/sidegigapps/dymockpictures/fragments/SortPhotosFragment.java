@@ -143,7 +143,7 @@ public class SortPhotosFragment extends Fragment implements
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_view_photos, container, false);
+        View view = inflater.inflate(R.layout.fragment_sort_photos, container, false);
 
         setupUI(view);
         onNewImageRequested();

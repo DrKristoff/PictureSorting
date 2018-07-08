@@ -1,6 +1,5 @@
 package com.sidegigapps.dymockpictures;
 
-import android.app.DialogFragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
@@ -45,6 +44,7 @@ import com.mikepenz.materialdrawer.util.DrawerUIUtils;
 import com.sidegigapps.dymockpictures.fragments.AchievementsFragment;
 import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
 import com.sidegigapps.dymockpictures.fragments.SortPhotosFragment;
+import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
 import com.sidegigapps.dymockpictures.models.UserData;
 
@@ -59,6 +59,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity implements
         SortPhotosFragment.OnFragmentInteractionListener{
@@ -78,6 +79,7 @@ public class MainActivity extends AppCompatActivity implements
     private static final String TAG = "RCD";
     private Toolbar mToolbar;
     private SortPhotosFragment sortPhotosFragment;
+    private ViewPhotosFragment viewPhotosFragment;
     private LeaderboardFragment leaderboardFragment;
     private AchievementsFragment achievementsFragment;
     private StorageReference mStorageRef;
@@ -86,7 +88,10 @@ public class MainActivity extends AppCompatActivity implements
     private UserData mUserData;
     private HashMap<String, Leaderboard> mLeaderboardsMap = new HashMap<>();
     private HashMap<String, UserData> mUsersMap = new HashMap<>();
-    public List<String> filenames = new ArrayList<>();
+
+    int viewPhotoBatchSize = 25;
+    int numBatchesToShow = 0;
+    String viewPhotosCurrentEra = "";
 
     public boolean mUserDataLoaded = false;
     public boolean mLeaderboardDataLoaded = false;
@@ -103,6 +108,9 @@ public class MainActivity extends AppCompatActivity implements
     Drawer drawer;
     private HashMap<Integer,String> anchorMap = new HashMap<>();
     private HashMap<String,String> anchorUrlMap = new HashMap<>();
+    public HashMap<String, ArrayList<String>> mEras;
+    public List<String> filenames = new ArrayList<>();
+    private HashMap<String,String> filenamesUrlMap = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -128,11 +136,54 @@ public class MainActivity extends AppCompatActivity implements
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
         setupDrawer();
+
     }
 
     private void loadImageData() {
         loadFilenames();
+        loadImageEras();
 
+    }
+
+    public ArrayList<String> getEraNamesArrayList(){
+        Set<String> keys = mEras.keySet();
+        return new ArrayList(keys);
+    }
+
+    public String[] getEraNames(){
+        Set<String> keys = mEras.keySet();
+        ArrayList<String> arrayList = new ArrayList(keys);
+        return arrayList.toArray(new String[arrayList.size()]);
+    }
+
+    public ArrayList<String> getImageNamesByEra(String era){
+        if(!mEras.containsKey(era)){
+            return new ArrayList<>();
+        } else {
+            return mEras.get(era);
+        }
+    }
+
+    public ArrayList<String> getImageUrlsByEra(String era){
+        ArrayList<String> imageNames = getImageNamesByEra(era);
+        ArrayList<String> result = new ArrayList<>();
+        for(String imageName : imageNames){
+            if(filenamesUrlMap.containsKey(imageName))
+            result.add(filenamesUrlMap.get(imageName));
+        }
+        return result;
+    }
+
+    public void loadMoreImages(){
+        int maxImages = mEras.get(viewPhotosCurrentEra).size();  //calling size on null list, that era arraylist hasn't been filled yet
+        numBatchesToShow++;
+
+        int listSize = Math.min(maxImages,numBatchesToShow*viewPhotoBatchSize);
+
+        ArrayList<String> filenames = mEras.get(viewPhotosCurrentEra);
+        ArrayList<String> result = new ArrayList<>(filenames.subList(0,listSize));
+
+        loadFilenamesUrls(result);
     }
 
     private void onFileNamesLoaded() {
@@ -163,9 +214,6 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-
-
-
     }
 
     private void fetchAnchorDownloadURLs() {
@@ -184,10 +232,20 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-
-
-
-
+    private void loadFilenamesUrls(ArrayList<String> imageFilenames){
+        for(String filename : imageFilenames){
+            Log.d("RCD",filename);
+            final String fileWithType = filename + ".jpg";
+            mStorageRef.child(fileWithType).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                @Override
+                public void onSuccess(Uri uri) {
+                    String url = uri.toString();
+                    Log.d("RCD","received");
+                    viewPhotosFragment.addImageURL(url);
+                }
+            });
+        }
+    }
 
 
     private void onUserDataLoaded() {
@@ -197,7 +255,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private void onLeaderboardDataLoaded() {
         Log.d("RCD", "onLeaderboardDataLoaded");
-        showPhotos();
+        sortPhotos();
     }
 
     public UserData getmUserData() {
@@ -236,8 +294,6 @@ public class MainActivity extends AppCompatActivity implements
         });
 
     }
-
-
 
     private void loadUserData() {
         Log.d("RCD", "loadUserData");
@@ -446,12 +502,24 @@ public class MainActivity extends AppCompatActivity implements
                 })
                 .build();
 
+
         PrimaryDrawerItem viewPhotosItem = new PrimaryDrawerItem()
-                .withName("Sort Photos");
+                .withName("View Photos");
         viewPhotosItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
             public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
-                showPhotos();
+                viewPhotos();
+                drawer.closeDrawer();
+                return true;
+            }
+        });
+
+        PrimaryDrawerItem sortPhotosItem = new PrimaryDrawerItem()
+                .withName("Sort Photos");
+        sortPhotosItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
+            @Override
+            public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
+                sortPhotos();
                 drawer.closeDrawer();
                 return true;
             }
@@ -468,27 +536,28 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
 
-/*        PrimaryDrawerItem achievementsItem = new PrimaryDrawerItem()
-                .withName("Achievements");
-        achievementsItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
-            @Override
-            public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
-                showAchievements();
-                drawer.closeDrawer();
-                return true;
-            }
-        });*/
-
         drawer = new DrawerBuilder().withActivity(this)
                 .withAccountHeader(headerResult)
                 .withToolbar(mToolbar)
-                .addDrawerItems(viewPhotosItem,leaderboardItem) //no achievements for now
+                .addDrawerItems(sortPhotosItem, viewPhotosItem, leaderboardItem) //no achievements for now
                 .build();
 
     }
 
-    private void showPhotos(){
-        Log.d("RCD","showPhotos");
+    private void viewPhotos(){
+        Log.d("RCD","viewPhotos");
+        getSupportActionBar().setTitle("Family Pictures");
+        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        viewPhotosFragment = new ViewPhotosFragment();
+
+        ft.replace(R.id.fragment_layout, viewPhotosFragment);
+
+        ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
+        ft.commit();
+    }
+
+    private void sortPhotos(){
+        Log.d("RCD","sortPhotos");
         getSupportActionBar().setTitle("Family Picture Sorting");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         sortPhotosFragment = new SortPhotosFragment();
@@ -536,6 +605,47 @@ public class MainActivity extends AppCompatActivity implements
                 // Handle any errors
             }
         });
+    }
+
+    private void loadImageEras() {
+        Log.d("RCD","loadImageEras");
+        
+        mImagesReference.addListenerForSingleValueEvent(
+                new ValueEventListener() {
+                    @Override
+                    public void onDataChange(DataSnapshot dataSnapshot) {
+                        //Get map of users in datasnapshot
+                        collectImageEras((Map<String,Object>) dataSnapshot.getValue());
+                    }
+
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
+                        //handle databaseError
+                    }
+                });
+    }
+
+    private void collectImageEras(Map<String, Object> users) {
+        mEras = new HashMap<>();
+        for (Map.Entry<String, Object> entry : users.entrySet()){
+            Log.d("RCD","test");
+            String imageName = entry.getKey();
+            String era = null;
+            try {
+                era = (String) ((HashMap)(entry.getValue())).get("era");
+            } catch (ClassCastException e) {
+                e.printStackTrace();
+                continue;
+            }
+            if(mEras.containsKey(era)){
+                ArrayList<String> arrayList = mEras.get(era);
+                arrayList.add(imageName);
+            } else {
+                ArrayList<String> arrayList = new ArrayList<>();
+                arrayList.add(imageName);
+                mEras.put(era,arrayList);
+            }
+        }
     }
 
     private void loadFilenamesFromByteString(byte[] bytes){
@@ -602,4 +712,8 @@ public class MainActivity extends AppCompatActivity implements
         return anchorUrlMap;
     }
 
+    public void setCurrentEra(String currentEra) {
+        numBatchesToShow = 0;
+        this.viewPhotosCurrentEra = currentEra;
+    }
 }

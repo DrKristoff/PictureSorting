@@ -15,30 +15,6 @@
       },
       "oauth_client": [
         {
-          "client_id": "256449474276-vm0o59pfhcck569o8rvjhhmf5vj1gu79.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.sidegigapps.dymockpictures",
-            "certificate_hash": "f0c45694b284d6e0a24e30b3c9dfdcbe064cc585"
-          }
-        },
-        {
-          "client_id": "256449474276-9gaims9o1ei498ri7vqaq9bvfete9un1.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.sidegigapps.dymockpictures",
-            "certificate_hash": "88c4098ead3c1199cc6e7b3cb12a913a88ef689a"
-          }
-        },
-        {
-          "client_id": "256449474276-vojt8gp64r1d33imredcqdbk0976jdot.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.sidegigapps.dymockpictures",
-            "certificate_hash": "7b56808606562cb322c90f075bdbcbfab7e0cc9e"
-          }
-        },
-        {
           "client_id": "256449474276-tt1i3qmhjr366p199gamp96qav34h590.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -52,6 +28,46 @@
           "android_info": {
             "package_name": "com.sidegigapps.dymockpictures",
             "certificate_hash": "52e1aa2da4fb5908a7f7d7307bca527f3ee100c5"
+          }
+        },
+        {
+          "client_id": "256449474276-vojt8gp64r1d33imredcqdbk0976jdot.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sidegigapps.dymockpictures",
+            "certificate_hash": "7b56808606562cb322c90f075bdbcbfab7e0cc9e"
+          }
+        },
+        {
+          "client_id": "256449474276-9gaims9o1ei498ri7vqaq9bvfete9un1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sidegigapps.dymockpictures",
+            "certificate_hash": "88c4098ead3c1199cc6e7b3cb12a913a88ef689a"
+          }
+        },
+        {
+          "client_id": "256449474276-vm0o59pfhcck569o8rvjhhmf5vj1gu79.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sidegigapps.dymockpictures",
+            "certificate_hash": "f0c45694b284d6e0a24e30b3c9dfdcbe064cc585"
+          }
+        },
+        {
+          "client_id": "256449474276-sodqb77m77psvj77cngghohtvgm1qc8a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sidegigapps.dymockpictures",
+            "certificate_hash": "ea16bdfda01eb11c0c400c78a0c7f321c04c7298"
+          }
+        },
+        {
+          "client_id": "256449474276-12075lftvvj9683p891tlahv1mf2p2l5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sidegigapps.dymockpictures",
+            "certificate_hash": "2f2ed0a6e0a5c32879600d90bd1fa78434ff5a24"
           }
         },
         {
