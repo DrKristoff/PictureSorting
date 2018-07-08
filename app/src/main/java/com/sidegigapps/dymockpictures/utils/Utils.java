@@ -15,4 +15,11 @@ import java.util.Date;
 
 public class Utils {
 
+    public static String getBacksideString(String filename){
+        return filename.substring(0,filename.length()-4) + "_b.jpg";
+    }
+
+    public static String getFrontsideString(String filename){
+        return filename.substring(0,filename.length()-6) + ".jpg";
+    }
 }

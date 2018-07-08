@@ -44,6 +44,7 @@ import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.models.GuidedSelectionHelper;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
+import com.sidegigapps.dymockpictures.utils.Utils;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Calendar;
@@ -58,10 +59,11 @@ public class SortPhotosFragment extends Fragment implements
     private static final int REQUEST_CODE = 1;
     private StorageReference mStorageRef;
     private String targetFilenameURL;
-    private ZoomageView targetImage;
+    private ZoomageView targetImage, backsideImage;
     private float targetImageRotation = 0f;
     private String targetFilename;
     private FloatingActionButton fab_rotate, fab_new, fab_save, fab_exact;
+    Button flip_button;
     private ProgressBar progressBar;
     private TextView eraTextView;
 
@@ -77,6 +79,8 @@ public class SortPhotosFragment extends Fragment implements
     private Button cancelButton, noButton, sameButton, yesButton;
     private ZoomageView guideTarget, guideComparison;
     private HashMap<String, String> anchorUrlMap = new HashMap<>();
+    List<String> mFilenames;
+    private boolean mHasBacksideText = false;
 
     public SortPhotosFragment() {
         // Required empty public constructor
@@ -106,13 +110,34 @@ public class SortPhotosFragment extends Fragment implements
         );
 
         anchorUrlMap = ((MainActivity)getActivity()).getAnchorUrlMap();
+
+
+        mFilenames = ((MainActivity)getActivity()).filenames;
     }
 
     public void onURLDownloaded(){
         Log.d("RCD","onURLDownloaded");
 
+        if(mHasBacksideText){
+            flip_button.setVisibility(View.VISIBLE);
+        } else {
+            flip_button.setVisibility(View.INVISIBLE);
+        }
         progressBar.setVisibility(View.INVISIBLE);
         displayImage();
+    }
+
+
+    private void onBacksideUrlDownloaded(String url) {
+        GlideApp.with(getActivity().getApplicationContext())
+                .load(url)
+                .placeholder(R.drawable.progress_animation)
+                .into(backsideImage);
+
+        backsideImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+        flip_button.setVisibility(View.VISIBLE);
+
     }
 
     @Override
@@ -129,6 +154,7 @@ public class SortPhotosFragment extends Fragment implements
 
     private void setupUI(View view){
         targetImage = view.findViewById(R.id.targetImage);
+        backsideImage = view.findViewById(R.id.backsideImage);
         progressBar = view.findViewById(R.id.indeterminateBar);
 
         eraTextView = view.findViewById(R.id.dateTextView);
@@ -137,6 +163,7 @@ public class SortPhotosFragment extends Fragment implements
         fab_rotate = view.findViewById(R.id.fab_rotate);
         fab_save = view.findViewById(R.id.fab_save);
         fab_exact = view.findViewById(R.id.fab_exact);
+        flip_button = view.findViewById(R.id.flip_button);
 
         bkg = view.findViewById(R.id.blackBackground);
         guideLayout = view.findViewById(R.id.guideFrameLayout);
@@ -233,15 +260,9 @@ public class SortPhotosFragment extends Fragment implements
                     case R.id.fab_exact:
                         onExactSortPressed();
                         break;
-/*                    case R.id.exact_sort_fab:
-                        onExactSortPressed();
+                    case R.id.flip_button:
+                        onFlipPressed();
                         break;
-                    case R.id.era_sort_fab:
-                        onEraSortPressed();
-                        break;
-                    case R.id.guided_sort_fab:
-                        onGuidedSortPressed();
-                        break;*/
                 }
 
             }
@@ -251,12 +272,64 @@ public class SortPhotosFragment extends Fragment implements
         fab_rotate.setOnClickListener(fab_listener);
         fab_save.setOnClickListener(fab_listener);
         fab_exact.setOnClickListener(fab_listener);
+        flip_button.setOnClickListener(fab_listener);
+
 
 
         //fab_exact.setOnClickListener(fab_listener);
         //fab_era.setOnClickListener(fab_listener);
         //fab_guided.setOnClickListener(fab_listener);
 
+    }
+
+    private void onFlipPressed() {
+        if(targetImage.getVisibility()==View.VISIBLE){
+            flip_button.setText("FRONT");
+            targetImage.animate()
+                    .alpha(0.0f)
+                    .setDuration(250)
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            super.onAnimationEnd(animation);
+                            targetImage.setVisibility(View.INVISIBLE);
+                        }
+                    });
+
+            backsideImage.setVisibility(View.VISIBLE);
+            backsideImage.animate()
+                    .alpha(1.0f)
+                    .setDuration(250)
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            super.onAnimationEnd(animation);
+                        }
+                    });
+        } else {
+            flip_button.setText("BACK");
+            backsideImage.animate()
+                .alpha(0.0f)
+                .setDuration(250)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        backsideImage.setVisibility(View.INVISIBLE);
+                    }
+                });
+
+            targetImage.setVisibility(View.VISIBLE);
+            targetImage.animate()
+                    .alpha(1.0f)
+                    .setDuration(250)
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            super.onAnimationEnd(animation);
+                        }
+                    });
+        }
     }
 
     private void onGuidedSortPressed(){
@@ -386,16 +459,23 @@ public class SortPhotosFragment extends Fragment implements
     private void getNextDownloadLink(){
         Random random = new Random();
 
-        List<String> filenames = ((MainActivity)getActivity()).filenames;
 
-        int index = random.nextInt(filenames.size());
-        String filename = filenames.get(index);
+        int index = random.nextInt(mFilenames.size());
+        String filename = mFilenames.get(index);
+
+        //TODO: detect the -b here
+        if(filename.endsWith("_b.jpg")){
+            mHasBacksideText = true;
+            filename = Utils.getFrontsideString(filename);
+        } else{
+            mHasBacksideText = mFilenames.contains(Utils.getBacksideString(filename));
+        }
+
         getFirebaseDownloadURL(filename);
     }
 
     private void displayImage() {
         Log.d("RCD","displayImage");
-
 
         if(targetFilenameURL==null){
             Log.d("RCD","targetFilenameURL was null");
@@ -497,7 +577,6 @@ public class SortPhotosFragment extends Fragment implements
 
     }
 
-
     private void rotateTargetImage() {
         Log.d("RCD", "Rotating:");
         Log.d("RCD", targetFilenameURL);
@@ -507,6 +586,8 @@ public class SortPhotosFragment extends Fragment implements
                 .transform(new RotateTransformation(getActivity(), targetImageRotation))
                 .into(targetImage);
         targetImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+
     }
 
     private void uploadBitmapToFirebase(final String filename, final String url, final float rotation) {
@@ -569,7 +650,25 @@ public class SortPhotosFragment extends Fragment implements
             }
         });
 
-        mStorageRef.child(filename).getMetadata().addOnSuccessListener(new OnSuccessListener<StorageMetadata>() {
+        if(mHasBacksideText){
+            String backsideString = filename.substring(0,filename.length()-4) + "_b.jpg";
+            mStorageRef.child(backsideString).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                @Override
+                public void onSuccess(Uri uri) {
+                    String url = uri.toString();
+                    onBacksideUrlDownloaded(url);
+                }
+            }).addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception exception) {
+                    Log.d("download", "FAILED");
+                    Log.d("download", exception.getMessage());
+                }
+            });
+
+        }
+
+/*        mStorageRef.child(filename).getMetadata().addOnSuccessListener(new OnSuccessListener<StorageMetadata>() {
             @Override
             public void onSuccess(StorageMetadata storageMetadata) {
                 // Metadata now contains the metadata for 'images/forest.jpg'
@@ -580,7 +679,7 @@ public class SortPhotosFragment extends Fragment implements
             public void onFailure(@NonNull Exception exception) {
                 // Uh-oh, an error occurred!
             }
-        });
+        });*/
     }
 
     private void getEraFromFireBase(String targetFilename) {
@@ -605,6 +704,12 @@ public class SortPhotosFragment extends Fragment implements
         ((MainActivity)getActivity()).updateImageDate(targetFilename,date);
         ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
 
+        String backsideFilename = Utils.getBacksideString(targetFilename);
+        if(mHasBacksideText){
+            ((MainActivity)getActivity()).updateImageDate(backsideFilename,date);
+            ((MainActivity)getActivity()).updateImageEra(backsideFilename,era);
+        }
+
     }
 
     private void onDateSelected(String date){
@@ -612,6 +717,12 @@ public class SortPhotosFragment extends Fragment implements
         eraTextView.setText(era);
         ((MainActivity)getActivity()).updateImageDate(targetFilename,date);
         ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
+
+        String backsideFilename = Utils.getBacksideString(targetFilename);
+        if(mHasBacksideText){
+            ((MainActivity)getActivity()).updateImageDate(backsideFilename,date);
+            ((MainActivity)getActivity()).updateImageEra(backsideFilename,era);
+        }
     }
 
     public interface OnFragmentInteractionListener {
