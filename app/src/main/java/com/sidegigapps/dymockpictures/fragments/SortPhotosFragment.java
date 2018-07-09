@@ -42,6 +42,7 @@ import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListene
 import com.sidegigapps.dymockpictures.GlideApp;
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
+import com.sidegigapps.dymockpictures.models.FirebaseStore;
 import com.sidegigapps.dymockpictures.models.GuidedSelectionHelper;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 import com.sidegigapps.dymockpictures.utils.Utils;
@@ -54,7 +55,8 @@ import java.util.Locale;
 import java.util.Random;
 
 public class SortPhotosFragment extends Fragment implements
-        EraDialogFragment.OnEraSelectionListener {
+        EraDialogFragment.OnEraSelectionListener,
+        FirebaseStore.EraDownloadListener{
 
     private static final int REQUEST_CODE = 1;
     private StorageReference mStorageRef;
@@ -79,8 +81,8 @@ public class SortPhotosFragment extends Fragment implements
     private Button cancelButton, noButton, sameButton, yesButton;
     private ZoomageView guideTarget, guideComparison;
     private HashMap<String, String> anchorUrlMap = new HashMap<>();
-    List<String> mFilenames;
     private boolean mHasBacksideText = false;
+    FirebaseStore fbStore;
 
     public SortPhotosFragment() {
         // Required empty public constructor
@@ -98,21 +100,16 @@ public class SortPhotosFragment extends Fragment implements
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            //mParam1 = getArguments().getString(ARG_PARAM1);
-            //mParam2 = getArguments().getString(ARG_PARAM2);
-        }
+
+        fbStore = ((MainActivity)getActivity()).getFbStore();
         mStorageRef = FirebaseStorage.getInstance().getReference();
         guideHelper = new GuidedSelectionHelper(
-                ((MainActivity)getActivity()).getAnchorMap(),
+                fbStore.getAnchorMap(),
                 getActivity().getResources().getStringArray(R.array.eras_array),
                 getActivity().getResources().getStringArray(R.array.era_dates_array)
         );
 
-        anchorUrlMap = ((MainActivity)getActivity()).getAnchorUrlMap();
-
-
-        mFilenames = ((MainActivity)getActivity()).filenames;
+        anchorUrlMap = fbStore.getAnchorUrlMap();
     }
 
     public void onURLDownloaded(){
@@ -335,7 +332,7 @@ public class SortPhotosFragment extends Fragment implements
     private void onGuidedSortPressed(){
         guideHelper.setFilename(targetFilename);
         showGuideDialog();
-        HashMap<Integer,String> anchorMap = ((MainActivity)getActivity()).getAnchorMap();
+        HashMap<Integer,String> anchorMap = fbStore.getAnchorMap();
     }
 
     private void showGuideDialog(){
@@ -460,15 +457,15 @@ public class SortPhotosFragment extends Fragment implements
         Random random = new Random();
 
 
-        int index = random.nextInt(mFilenames.size());
-        String filename = mFilenames.get(index);
+        int index = random.nextInt(fbStore.filenames.size());
+        String filename = fbStore.filenames.get(index);
 
         //TODO: detect the -b here
         if(filename.endsWith("_b.jpg")){
             mHasBacksideText = true;
             filename = Utils.getFrontsideString(filename);
         } else{
-            mHasBacksideText = mFilenames.contains(Utils.getBacksideString(filename));
+            mHasBacksideText = fbStore.filenames.contains(Utils.getBacksideString(filename));
         }
 
         getFirebaseDownloadURL(filename);
@@ -499,11 +496,11 @@ public class SortPhotosFragment extends Fragment implements
     }
 
     private void incrementViews() {
-        ((MainActivity)getActivity()).incrementViews();
+        fbStore.incrementViews();
     }
 
     private void incrementRotations() {
-        ((MainActivity)getActivity()).incrementRotations();
+        fbStore.incrementRotations();
     }
 
     public void onButtonPressed(Uri uri) {
@@ -566,7 +563,7 @@ public class SortPhotosFragment extends Fragment implements
         uploadBitmapToFirebase(targetFilename,targetFilenameURL,targetImageRotation);
         targetImageRotation = 0f;
         Toast.makeText(getActivity(), "Saving Image", Toast.LENGTH_SHORT).show();
-        ((MainActivity)getActivity()).incrementDownloads();
+        fbStore.incrementDownloads();
     }
 
     public void onRotateFabPressed() {
@@ -683,7 +680,8 @@ public class SortPhotosFragment extends Fragment implements
     }
 
     private void getEraFromFireBase(String targetFilename) {
-        ((MainActivity)getActivity()).fetchEra(targetFilename);
+        fbStore.registerEraListener(this);
+        fbStore.fetchEra(targetFilename);
 
     }
 
@@ -698,16 +696,16 @@ public class SortPhotosFragment extends Fragment implements
     }
 
     private void onEraSelected(String era) {
-        ((MainActivity)getActivity()).incrementSorts();
+        fbStore.incrementSorts();
         String date = getDateFromEra(era,getActivity());
         eraTextView.setText(era);
-        ((MainActivity)getActivity()).updateImageDate(targetFilename,date);
-        ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
+        fbStore.updateImageDate(targetFilename,date);
+        fbStore.updateImageEra(targetFilename,era);
 
         String backsideFilename = Utils.getBacksideString(targetFilename);
         if(mHasBacksideText){
-            ((MainActivity)getActivity()).updateImageDate(backsideFilename,date);
-            ((MainActivity)getActivity()).updateImageEra(backsideFilename,era);
+            fbStore.updateImageDate(backsideFilename,date);
+            fbStore.updateImageEra(backsideFilename,era);
         }
 
     }
@@ -715,14 +713,19 @@ public class SortPhotosFragment extends Fragment implements
     private void onDateSelected(String date){
         String era = getEraFromDate(date);
         eraTextView.setText(era);
-        ((MainActivity)getActivity()).updateImageDate(targetFilename,date);
-        ((MainActivity)getActivity()).updateImageEra(targetFilename,era);
+        fbStore.updateImageDate(targetFilename,date);
+        fbStore.updateImageEra(targetFilename,era);
 
         String backsideFilename = Utils.getBacksideString(targetFilename);
         if(mHasBacksideText){
-            ((MainActivity)getActivity()).updateImageDate(backsideFilename,date);
-            ((MainActivity)getActivity()).updateImageEra(backsideFilename,era);
+            fbStore.updateImageDate(backsideFilename,date);
+            fbStore.updateImageEra(backsideFilename,era);
         }
+    }
+
+    @Override
+    public void onEraDownloaded(String era) {
+        onEraReceivedFromFirebase(era);
     }
 
     public interface OnFragmentInteractionListener {

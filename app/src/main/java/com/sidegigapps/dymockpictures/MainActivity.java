@@ -17,6 +17,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -45,6 +46,7 @@ import com.sidegigapps.dymockpictures.fragments.AchievementsFragment;
 import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
 import com.sidegigapps.dymockpictures.fragments.SortPhotosFragment;
 import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
+import com.sidegigapps.dymockpictures.models.FirebaseStore;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
 import com.sidegigapps.dymockpictures.models.UserData;
 
@@ -62,17 +64,9 @@ import java.util.Map;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity implements
-        SortPhotosFragment.OnFragmentInteractionListener{
+        SortPhotosFragment.OnFragmentInteractionListener,
+        FirebaseStore.InitializationListener {
 
-
-    private static final String LEADERBOARDS = "leaderboards";
-    private static final String USERS = "users";
-    private static final String IMAGES = "images";
-    public static final String LEADERBOARD_VIEWS = "Views";
-    public static final String LEADERBOARD_ROTATIONS = "Rotations";
-    public static final String LEADERBOARD_SORTED = "Sorted";
-    public static final String LEADERBOARD_TRANSCRIBED = "Transcribed";
-    public static final String LEADERBOARD_DOWNLOADS = "Downloads";
     private GoogleSignInAccount mGoogleSignInAccount;
     private SharedPreferences prefs;
     private FirebaseAuth mAuth;
@@ -82,35 +76,10 @@ public class MainActivity extends AppCompatActivity implements
     private ViewPhotosFragment viewPhotosFragment;
     private LeaderboardFragment leaderboardFragment;
     private AchievementsFragment achievementsFragment;
-    private StorageReference mStorageRef;
-    private DatabaseReference mDatabase;
-    private DatabaseReference mUsersReference, mLeaderboardReference, mImagesReference;
-    private UserData mUserData;
-    private HashMap<String, Leaderboard> mLeaderboardsMap = new HashMap<>();
-    private HashMap<String, UserData> mUsersMap = new HashMap<>();
 
-    int viewPhotoBatchSize = 25;
-    int numBatchesToShow = 0;
-    String viewPhotosCurrentEra = "";
-
-    public boolean mUserDataLoaded = false;
-    public boolean mLeaderboardDataLoaded = false;
-    private boolean mSetupComplete = false;
-
-    public final String[] leaderboardNames = new String[]{
-            LEADERBOARD_VIEWS,
-            LEADERBOARD_ROTATIONS,
-            LEADERBOARD_SORTED,
-            //LEADERBOARD_TRANSCRIBED,
-            LEADERBOARD_DOWNLOADS
-    };
+    FirebaseStore mFbStore;
 
     Drawer drawer;
-    private HashMap<Integer,String> anchorMap = new HashMap<>();
-    private HashMap<String,String> anchorUrlMap = new HashMap<>();
-    public HashMap<String, ArrayList<String>> mEras;
-    public List<String> filenames = new ArrayList<>();
-    private HashMap<String,String> filenamesUrlMap = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,247 +91,15 @@ public class MainActivity extends AppCompatActivity implements
 
         mGoogleSignInAccount = getIntent().getParcelableExtra("ACCOUNT");
         onConnected(mGoogleSignInAccount);
-        mAuth = FirebaseAuth.getInstance();
-
-        mStorageRef = FirebaseStorage.getInstance().getReference();
-        mDatabase = FirebaseDatabase.getInstance().getReference();
-
-        mUsersReference = mDatabase.child(USERS);
-        mLeaderboardReference = mDatabase.child(LEADERBOARDS);
-        mImagesReference = mDatabase.child(IMAGES);
-
-        loadImageData();
 
         mToolbar = findViewById(R.id.toolbar);
         setSupportActionBar(mToolbar);
+
+        mFbStore = new FirebaseStore(mGoogleSignInAccount, this);
+
         setupDrawer();
 
     }
-
-    private void loadImageData() {
-        loadFilenames();
-        loadImageEras();
-
-    }
-
-    public ArrayList<String> getEraNamesArrayList(){
-        Set<String> keys = mEras.keySet();
-        return new ArrayList(keys);
-    }
-
-    public String[] getEraNames(){
-        Set<String> keys = mEras.keySet();
-        ArrayList<String> arrayList = new ArrayList(keys);
-        return arrayList.toArray(new String[arrayList.size()]);
-    }
-
-    public ArrayList<String> getImageNamesByEra(String era){
-        if(!mEras.containsKey(era)){
-            return new ArrayList<>();
-        } else {
-            return mEras.get(era);
-        }
-    }
-
-    public ArrayList<String> getImageUrlsByEra(String era){
-        ArrayList<String> imageNames = getImageNamesByEra(era);
-        ArrayList<String> result = new ArrayList<>();
-        for(String imageName : imageNames){
-            if(filenamesUrlMap.containsKey(imageName))
-            result.add(filenamesUrlMap.get(imageName));
-        }
-        return result;
-    }
-
-    public void loadMoreImages(){
-        int maxImages = mEras.get(viewPhotosCurrentEra).size();  //calling size on null list, that era arraylist hasn't been filled yet
-        numBatchesToShow++;
-
-        int listSize = Math.min(maxImages,numBatchesToShow*viewPhotoBatchSize);
-
-        ArrayList<String> filenames = mEras.get(viewPhotosCurrentEra);
-        ArrayList<String> result = new ArrayList<>(filenames.subList(0,listSize));
-
-        loadFilenamesUrls(result);
-    }
-
-    private void onFileNamesLoaded() {
-        Log.d("RCD", "onFileNamesLoaded");
-        Log.d("RCD", "Filenames loaded successfully");
-        Log.d("RCD", "There are " + String.valueOf(filenames.size()) + " files");
-        loadUserData();
-        loadAnchorData();
-    }
-
-    private void loadAnchorData() {
-        Log.d("RCD", "loadAnchorData");
-        DatabaseReference reference = mDatabase.child("images").child("anchors");
-        reference.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                ArrayList<String> anchorsList = (ArrayList<String>)snapshot.getValue();
-                for (int i = 0; i < anchorsList.size(); i ++) {
-                    String anchor = anchorsList.get(i);
-                    anchorMap.put(i,anchor);
-                }
-
-                fetchAnchorDownloadURLs();
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });
-
-    }
-
-    private void fetchAnchorDownloadURLs() {
-        for(Map.Entry<Integer,String> entry : anchorMap.entrySet()){
-            final String filename = entry.getValue();
-
-            mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-                @Override
-                public void onSuccess(Uri uri) {
-                    String url = uri.toString();
-                    anchorUrlMap.put(filename,url);
-                    Log.d("ANCHOR","filename: " + filename);
-                    Log.d("ANCHOR","URL: " + url);
-                }
-            });
-        }
-    }
-
-    private void loadFilenamesUrls(ArrayList<String> imageFilenames){
-        for(String filename : imageFilenames){
-            Log.d("RCD",filename);
-            final String fileWithType = filename + ".jpg";
-            mStorageRef.child(fileWithType).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-                @Override
-                public void onSuccess(Uri uri) {
-                    String url = uri.toString();
-                    Log.d("RCD","received");
-                    viewPhotosFragment.addImageURL(url);
-                }
-            });
-        }
-    }
-
-
-    private void onUserDataLoaded() {
-        Log.d("RCD", "onUserDataLoaded");
-        setupLeaderboardListener();
-    }
-
-    private void onLeaderboardDataLoaded() {
-        Log.d("RCD", "onLeaderboardDataLoaded");
-        sortPhotos();
-    }
-
-    public UserData getmUserData() {
-        return mUserData;
-    }
-
-    private void setupLeaderboardListener() {
-        Log.d("RCD", "setupLeaderboardListener");
-
-        mLeaderboardReference.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                for (String leaderboardName : leaderboardNames) {
-                    if (snapshot.child(leaderboardName).exists()) {
-                        HashMap<String, Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
-                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName, map);
-                        mLeaderboardsMap.put(leaderboardName, newLeaderboard);
-                    } else {
-                        Log.d("RCD", "leaderboard does not exist: " + leaderboardName);
-                        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(0);  //race conditions, mUserData was still null
-                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName);
-                        mLeaderboardsMap.put(leaderboardName, newLeaderboard);
-                    }
-                }
-
-                if (!mLeaderboardDataLoaded) {
-                    onLeaderboardDataLoaded();
-                    mLeaderboardDataLoaded = true;
-                }
-
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });
-
-    }
-
-    private void loadUserData() {
-        Log.d("RCD", "loadUserData");
-        mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                if (snapshot.child(mGoogleSignInAccount.getId()).exists()) {
-                    Log.d("RCD", "account already exists: " + mGoogleSignInAccount.getId());
-                    HashMap<String, Object> map = (HashMap<String, Object>) snapshot.getValue();
-                    mUserData = new UserData(map, mGoogleSignInAccount.getId());
-                } else {
-                    Log.d("RCD", "account does not exist: " + mGoogleSignInAccount.getId());
-                    mUserData = new UserData(mGoogleSignInAccount);
-                    mUsersReference.child(mUserData.uuid).setValue(mUserData);
-                    Log.d("RCD", "user created");
-                }
-
-                for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                    HashMap<String, Object> childMap = (HashMap<String, Object>) childSnapshot.getValue();
-                    UserData userData = new UserData(childMap);
-                    mUsersMap.put(userData.getUuid(), userData);
-                }
-
-                mUserDataLoaded = true;
-                onUserDataLoaded();
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });
-
-    }
-
-    public UserData getUserDataByUUID(String uuid) {
-        return mUsersMap.get(uuid);
-    }
-
-    public void incrementRotations() {
-        incrementScores(LEADERBOARD_ROTATIONS);
-    }
-
-    public void incrementViews() {
-        incrementScores(LEADERBOARD_VIEWS);
-    }
-
-    public void incrementSorts() {
-        incrementScores(LEADERBOARD_SORTED);
-    }
-
-    public void incrementTranscribes() {
-        incrementScores(LEADERBOARD_TRANSCRIBED);
-    }
-
-    public void incrementDownloads() {
-        incrementScores(LEADERBOARD_DOWNLOADS);
-    }
-
-    public void incrementScores(String leaderboardName) {
-        Leaderboard leaderboard = mLeaderboardsMap.get(leaderboardName);
-        long score = leaderboard.getScoreByUUID(mUserData.uuid);
-        score += 1;
-        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(score);
-
-        Log.d("RCD", "UPDATING " + leaderboardName);
-        Log.d("RCD", "NOW " + String.valueOf(score));
-
-    }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -539,13 +276,13 @@ public class MainActivity extends AppCompatActivity implements
         drawer = new DrawerBuilder().withActivity(this)
                 .withAccountHeader(headerResult)
                 .withToolbar(mToolbar)
-                .addDrawerItems(sortPhotosItem, viewPhotosItem, leaderboardItem) //no achievements for now
+                .addDrawerItems(viewPhotosItem, sortPhotosItem, leaderboardItem) //no achievements for now
                 .build();
 
     }
 
-    private void viewPhotos(){
-        Log.d("RCD","viewPhotos");
+    private void viewPhotos() {
+        Log.d("RCD", "viewPhotos");
         getSupportActionBar().setTitle("Family Pictures");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         viewPhotosFragment = new ViewPhotosFragment();
@@ -556,8 +293,8 @@ public class MainActivity extends AppCompatActivity implements
         ft.commit();
     }
 
-    private void sortPhotos(){
-        Log.d("RCD","sortPhotos");
+    private void sortPhotos() {
+        Log.d("RCD", "sortPhotos");
         getSupportActionBar().setTitle("Family Picture Sorting");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         sortPhotosFragment = new SortPhotosFragment();
@@ -581,139 +318,21 @@ public class MainActivity extends AppCompatActivity implements
         getSupportActionBar().setTitle("Leaderboards");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         leaderboardFragment = new LeaderboardFragment();
-        leaderboardFragment.setLeaderboardData(mLeaderboardsMap);
+        leaderboardFragment.setLeaderboardData(mFbStore.getmLeaderboardsMap());
         ft.replace(R.id.fragment_layout, leaderboardFragment);
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();
 
     }
 
-    private void loadFilenames() {
-        Log.d("RCD","loadFilenames");
-
-        StorageReference filenamesRef = mStorageRef.child("filenames.txt");
-
-        final long ONE_MEGABYTE = 1024 * 1024;
-        filenamesRef.getBytes(ONE_MEGABYTE).addOnSuccessListener(new OnSuccessListener<byte[]>() {
-            @Override
-            public void onSuccess(byte[] bytes) {
-                loadFilenamesFromByteString(bytes);
-            }
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                // Handle any errors
-            }
-        });
+    public FirebaseStore getFbStore() {
+        return mFbStore;
     }
 
-    private void loadImageEras() {
-        Log.d("RCD","loadImageEras");
-        
-        mImagesReference.addListenerForSingleValueEvent(
-                new ValueEventListener() {
-                    @Override
-                    public void onDataChange(DataSnapshot dataSnapshot) {
-                        //Get map of users in datasnapshot
-                        collectImageEras((Map<String,Object>) dataSnapshot.getValue());
-                    }
+    @Override
+    public void onInitializationComplete() {
+        //viewPhotos();
 
-                    @Override
-                    public void onCancelled(DatabaseError databaseError) {
-                        //handle databaseError
-                    }
-                });
-    }
-
-    private void collectImageEras(Map<String, Object> users) {
-        mEras = new HashMap<>();
-        for (Map.Entry<String, Object> entry : users.entrySet()){
-            Log.d("RCD","test");
-            String imageName = entry.getKey();
-            String era = null;
-            try {
-                era = (String) ((HashMap)(entry.getValue())).get("era");
-            } catch (ClassCastException e) {
-                e.printStackTrace();
-                continue;
-            }
-            if(mEras.containsKey(era)){
-                ArrayList<String> arrayList = mEras.get(era);
-                arrayList.add(imageName);
-            } else {
-                ArrayList<String> arrayList = new ArrayList<>();
-                arrayList.add(imageName);
-                mEras.put(era,arrayList);
-            }
-        }
-    }
-
-    private void loadFilenamesFromByteString(byte[] bytes){
-        Log.d("RCD","loadFilenamesFromByteString");
-        InputStream is = new ByteArrayInputStream(bytes);
-
-        BufferedReader reader;
-        try {
-            reader = new BufferedReader(new InputStreamReader(is));
-            String filename = reader.readLine();
-            while(filename != null){
-                filenames.add(filename);
-                filename = reader.readLine();
-            }
-            is.close();
-            onFileNamesLoaded();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        } finally {
-            try {
-                if (is != null)
-                    is.close();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        }
-    }
-
-    public void updateImageEra(String filename, String era) {
-        String name = FilenameUtils.removeExtension(filename);
-        mImagesReference.child(name).child("era").setValue(era);
-    }
-
-    public void updateImageDate(String filename, String date) {
-        String name = FilenameUtils.removeExtension(filename);
-        mImagesReference.child(name).child("date").setValue(date);
-    }
-
-    public void fetchEra(String targetFilename) {
-        String formatted = FilenameUtils.removeExtension(targetFilename);
-        mImagesReference.child(formatted).child("era").addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                Log.d("RCD",snapshot.toString());
-                if(snapshot.getValue()!=null){
-                    sortPhotosFragment.onEraReceivedFromFirebase((String)snapshot.getValue());
-                } else {
-                    sortPhotosFragment.onEraReceivedFromFirebase("Unknown Era");
-                }
-
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });
-    }
-
-    public HashMap<Integer,String> getAnchorMap() {
-        return anchorMap;
-    }
-
-    public HashMap<String,String> getAnchorUrlMap() {
-        return anchorUrlMap;
-    }
-
-    public void setCurrentEra(String currentEra) {
-        numBatchesToShow = 0;
-        this.viewPhotosCurrentEra = currentEra;
+        Toast.makeText(this, "LOADING COMPLETE", Toast.LENGTH_SHORT).show();
     }
 }

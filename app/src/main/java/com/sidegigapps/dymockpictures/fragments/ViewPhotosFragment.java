@@ -1,7 +1,6 @@
 package com.sidegigapps.dymockpictures.fragments;
 
 import android.content.Context;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.widget.SwipeRefreshLayout;
@@ -16,32 +15,28 @@ import android.widget.Spinner;
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.PhotoGridViewAdapter;
 import com.sidegigapps.dymockpictures.R;
+import com.sidegigapps.dymockpictures.models.FirebaseStore;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-public class ViewPhotosFragment extends Fragment {
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
+public class ViewPhotosFragment extends Fragment implements
+        FirebaseStore.UrlDownloadListener{
+
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
-
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
 
     MainActivity mActivity;
     Spinner mSpinner;
     GridView mGridview;
     String mEra;
 
+    FirebaseStore fbStore;
+
     private String [] eras;
 
-    public static ArrayList<String> eatFoodyImages = new ArrayList<>();
-    private ArrayList<String> imageURLs = new ArrayList<>();
-
-    private OnFragmentInteractionListener mListener;
+    int viewPhotoBatchSize = 25;
+    int numBatchesToShow = 0;
 
     public ViewPhotosFragment() {
         // Required empty public constructor
@@ -59,10 +54,6 @@ public class ViewPhotosFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
-        }
     }
 
     @Override
@@ -70,6 +61,8 @@ public class ViewPhotosFragment extends Fragment {
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_photo_gallery, container, false);
+
+        fbStore = ((MainActivity)getActivity()).getFbStore();
 
         SwipeRefreshLayout swipeLayout = view.findViewById(R.id.swipeLayout);
         swipeLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
@@ -79,21 +72,6 @@ public class ViewPhotosFragment extends Fragment {
             }
         });
 
-        eatFoodyImages.add("http://i.imgur.com/rFLNqWI.jpg");
-        eatFoodyImages.add("http://i.imgur.com/C9pBVt7.jpg");
-        eatFoodyImages.add("http://i.imgur.com/aIy5R2k.jpg");
-        eatFoodyImages.add("http://i.imgur.com/MoJs9pT.jpg");
-        eatFoodyImages.add("http://i.imgur.com/S963yEM.jpg");
-        eatFoodyImages.add("http://i.imgur.com/rLR2cyc.jpg");
-        eatFoodyImages.add("http://i.imgur.com/SEPdUIx.jpg");
-        eatFoodyImages.add("http://i.imgur.com/aC9OjaM.jpg");
-        eatFoodyImages.add("http://i.imgur.com/76Jfv9b.jpg");
-        eatFoodyImages.add("http://i.imgur.com/fUX7EIB.jpg");
-        eatFoodyImages.add("http://i.imgur.com/syELajx.jpg");
-        eatFoodyImages.add("http://i.imgur.com/COzBnru.jpg");
-        eatFoodyImages.add("http://i.imgur.com/Z3QjilA.jpg");
-
-        //eras = ((MainActivity)getActivity()).getEraNames();
         eras = getActivity().getResources().getStringArray(R.array.eras_array);
         mEra = eras[0];
 
@@ -109,7 +87,7 @@ public class ViewPhotosFragment extends Fragment {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 mEra = eras[position];
-                mActivity.setCurrentEra(mEra);
+                resetBatchCount();
                 clearAdapter();
                 loadMorePhotos();
 
@@ -121,14 +99,33 @@ public class ViewPhotosFragment extends Fragment {
             }
         });
 
-        mActivity.setCurrentEra(mEra);
+        resetBatchCount();
         loadMorePhotos();
 
         return view;
     }
 
     private void loadMorePhotos() {
-        mActivity.loadMoreImages();
+        fbStore.registerUrlListener(this);
+        ArrayList<String> eraFilenames = fbStore.getFilenamesByEra(mEra);
+        int maxImages = eraFilenames.size();  //calling size on null list, that era arraylist hasn't been filled yet
+        numBatchesToShow++;
+
+        int listSize = Math.min(maxImages,numBatchesToShow*viewPhotoBatchSize);
+        ArrayList<String> result = new ArrayList<>(eraFilenames.subList(0,listSize));
+
+        fbStore.loadFilenamesUrls(result);
+    }
+
+    @Override
+    public void onUrlDownloaded(String url) {
+        addImageURL(url);
+    }
+
+    //define callback interface
+    private interface UrlCallback {
+
+        void onUrlDownloaded(String result);
     }
 
     public void addImageURL(String url){
@@ -149,24 +146,8 @@ public class ViewPhotosFragment extends Fragment {
         mActivity = (MainActivity)getActivity();
     }
 
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        mListener = null;
-    }
 
-    /**
-     * This interface must be implemented by activities that contain this
-     * fragment to allow an interaction in this fragment to be communicated
-     * to the activity and potentially other fragments contained in that
-     * activity.
-     * <p>
-     * See the Android Training lesson <a href=
-     * "http://developer.android.com/training/basics/fragments/communicating.html"
-     * >Communicating with Other Fragments</a> for more information.
-     */
-    public interface OnFragmentInteractionListener {
-        // TODO: Update argument type and name
-        void onFragmentInteraction(Uri uri);
+    public void resetBatchCount() {
+        numBatchesToShow = 0;
     }
 }

@@ -17,6 +17,7 @@ import android.widget.TextView;
 import com.sidegigapps.dymockpictures.GlideApp;
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
+import com.sidegigapps.dymockpictures.models.FirebaseStore;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
 import com.sidegigapps.dymockpictures.models.UserData;
 
@@ -29,6 +30,9 @@ public class LeaderboardFragment extends Fragment {
     private static final String ARG_PARAM2 = "param2";
 
     private HashMap<String, Leaderboard> leaderboardsMap;
+
+
+    FirebaseStore fbStore;
 
 
     private RecyclerView mRecyclerView;
@@ -61,10 +65,10 @@ public class LeaderboardFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
-        }
+
+
+        fbStore = ((MainActivity)getActivity()).getFbStore();
+
     }
 
     @Override
@@ -87,7 +91,7 @@ public class LeaderboardFragment extends Fragment {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 getActivity(),
                 R.layout.spinner_item,
-                ((MainActivity)getActivity()).leaderboardNames
+                fbStore.leaderboardNames
         );
 
         spinner.setAdapter(adapter);
@@ -107,7 +111,7 @@ public class LeaderboardFragment extends Fragment {
 
 
 
-        showLeaderboard(MainActivity.LEADERBOARD_VIEWS);
+        showLeaderboard(fbStore.LEADERBOARD_VIEWS);
 
         return view;
     }
@@ -156,7 +160,7 @@ public class LeaderboardFragment extends Fragment {
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
             String uuid = mLeaderboard.getUUIDByLeaderboardPosition(position);
-            UserData userData = ((MainActivity)getActivity()).getUserDataByUUID(uuid);
+            UserData userData = fbStore.getUserDataByUUID(uuid);
             if (userData==null) return;
 
             holder.mNameTextView.setText(userData.getName());
