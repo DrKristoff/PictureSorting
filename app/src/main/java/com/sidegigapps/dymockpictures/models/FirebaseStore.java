@@ -2,6 +2,7 @@ package com.sidegigapps.dymockpictures.models;
 
 import android.net.Uri;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -15,11 +16,8 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
-import com.sidegigapps.dymockpictures.fragments.SortPhotosFragment;
-import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 
 import org.apache.commons.io.FilenameUtils;
-import org.threeten.bp.chrono.Era;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -284,24 +282,28 @@ public class FirebaseStore {
     }
 
     public void loadFilenamesUrls(ArrayList<String> imageFilenames){
-        for(String filename : imageFilenames){
-            Log.d("RCD",filename);
+        Log.d("FirebaseStore","loadFilenamesUrls " + String.valueOf(imageFilenames.size()));
+        for(final String filename : imageFilenames){
+            Log.d("FirebaseStore",filename);
             final String fileWithType = filename + ".jpg";
             mStorageRef.child(fileWithType).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
                 @Override
                 public void onSuccess(Uri uri) {
                     String url = uri.toString();
-                    Log.d("RCD","received");
+                    Log.d("FirebaseStore","received: " + fileWithType);
                     if(mUrlListener!=null){
-                        mUrlListener.onUrlDownloaded(url);
+                        mUrlListener.onUrlDownloaded(filename,url);
                     }
 
 
                 }
             });
         }
+
+        mUrlListener.onAllDownloadsComplete();
     }
 
+    @Nullable
     public void registerUrlListener(UrlDownloadListener listener) {
         mUrlListener = listener;
     }
@@ -311,12 +313,24 @@ public class FirebaseStore {
     }
 
     public interface UrlDownloadListener{
-        void onUrlDownloaded(String url);
+        void onUrlDownloaded(String filename, String url);
+        void onAllDownloadsComplete();
+        void onEraSetupComplete();
     }
 
-    public ArrayList<String> getFilenamesByEra(String era) {
+    public ArrayList<String> getFilenamesByEra(String era, boolean includeBackside) {
         if (mEraFilenames.containsKey(era)) {
-            return mEraFilenames.get(era);
+            if(includeBackside){
+                return mEraFilenames.get(era);
+            } else {
+                ArrayList<String> results = new ArrayList<>();
+                for(String filename : mEraFilenames.get(era)){
+                    if(!filename.endsWith("_b")){
+                        results.add(filename);
+                    }
+                }
+                return results;
+            }
         } else {
             return new ArrayList<>();
         }
@@ -372,7 +386,7 @@ public class FirebaseStore {
             String imageName = entry.getKey();
             String era = null;
             try {
-                era = (String) ((HashMap)(entry.getValue())).get("era");
+                era = ((HashMap<String,String>)(entry.getValue())).get("era");
             } catch (ClassCastException e) {
                 e.printStackTrace();
                 continue;
@@ -386,6 +400,8 @@ public class FirebaseStore {
                 mEraFilenames.put(era,arrayList);
             }
         }
+
+        mUrlListener.onEraSetupComplete();
     }
 
     private void loadFilenamesFromByteString(byte[] bytes){

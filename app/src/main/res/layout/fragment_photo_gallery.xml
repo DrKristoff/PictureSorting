@@ -9,35 +9,41 @@
     <Spinner
         android:id="@+id/spinner2"
         android:layout_width="match_parent"
-        android:padding="10dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:layout_marginTop="?android:attr/actionBarSize"
+        android:padding="10dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <android.support.v4.widget.SwipeRefreshLayout
-        android:id="@+id/swipeLayout"
+
+    <GridView
+        android:id="@+id/photo_gridview"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:numColumns="4"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/spinner2">
+        app:layout_constraintTop_toBottomOf="@+id/spinner2" />
 
-        <GridView
-            android:id="@+id/photo_gridview"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginBottom="8dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginStart="16dp"
-            android:numColumns="4"
-            android:layout_marginTop="8dp" />
-
-
-    </android.support.v4.widget.SwipeRefreshLayout>
+    <Button
+        android:id="@+id/buttonLoadMore"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:text="Load More"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/photo_gridview" />
 
 </android.support.constraint.ConstraintLayout>

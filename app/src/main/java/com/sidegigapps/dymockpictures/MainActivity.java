@@ -5,7 +5,6 @@ import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -20,16 +19,7 @@ import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 import com.mikepenz.iconics.IconicsDrawable;
 import com.mikepenz.materialdrawer.AccountHeader;
 import com.mikepenz.materialdrawer.AccountHeaderBuilder;
@@ -47,26 +37,14 @@ import com.sidegigapps.dymockpictures.fragments.LeaderboardFragment;
 import com.sidegigapps.dymockpictures.fragments.SortPhotosFragment;
 import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 import com.sidegigapps.dymockpictures.models.FirebaseStore;
-import com.sidegigapps.dymockpictures.models.Leaderboard;
-import com.sidegigapps.dymockpictures.models.UserData;
-
-import org.apache.commons.io.FilenameUtils;
-
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 public class MainActivity extends AppCompatActivity implements
         SortPhotosFragment.OnFragmentInteractionListener,
         FirebaseStore.InitializationListener {
 
+    private static final String VIEW_PHOTOS_FRAG = "view_photos_fragment";
+    private static final String SORT_PHOTOS_FRAG = "sort_photos_fragment";
+    private static final String LEADERBOARD_FRAG = "leaderboard_fragment";
     private GoogleSignInAccount mGoogleSignInAccount;
     private SharedPreferences prefs;
     private FirebaseAuth mAuth;
@@ -80,6 +58,7 @@ public class MainActivity extends AppCompatActivity implements
     FirebaseStore mFbStore;
 
     Drawer drawer;
+    private String currentFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,6 +78,8 @@ public class MainActivity extends AppCompatActivity implements
 
         setupDrawer();
 
+        viewPhotos();
+
     }
 
     @Override
@@ -110,17 +91,23 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onBackPressed() {
-        new AlertDialog.Builder(this)
-                .setTitle("Sign Out?")
-                .setMessage("Are you sure you want to sign out?")
-                .setNegativeButton(android.R.string.no, null)
-                .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        boolean result = prefs.edit().putBoolean("signed_in", false).commit();
-                        MainActivity.super.onBackPressed();
-                    }
-                }).create().show();
+
+        if(currentFragment.equals(SORT_PHOTOS_FRAG)){
+            viewPhotos();
+        } else {
+            new AlertDialog.Builder(this)
+                    .setTitle("Sign Out?")
+                    .setMessage("Are you sure you want to sign out?")
+                    .setNegativeButton(android.R.string.no, null)
+                    .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            boolean result = prefs.edit().putBoolean("signed_in", false).commit();
+                            MainActivity.super.onBackPressed();
+                        }
+                    }).create().show();
+        }
+
     }
 
     @Override
@@ -288,6 +275,7 @@ public class MainActivity extends AppCompatActivity implements
         viewPhotosFragment = new ViewPhotosFragment();
 
         ft.replace(R.id.fragment_layout, viewPhotosFragment);
+        currentFragment = VIEW_PHOTOS_FRAG;
 
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();
@@ -300,6 +288,7 @@ public class MainActivity extends AppCompatActivity implements
         sortPhotosFragment = new SortPhotosFragment();
 
         ft.replace(R.id.fragment_layout, sortPhotosFragment);
+        currentFragment = SORT_PHOTOS_FRAG;
 
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();
@@ -323,6 +312,8 @@ public class MainActivity extends AppCompatActivity implements
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();
 
+        currentFragment = LEADERBOARD_FRAG;
+
     }
 
     public FirebaseStore getFbStore() {
@@ -334,5 +325,22 @@ public class MainActivity extends AppCompatActivity implements
         //viewPhotos();
 
         Toast.makeText(this, "LOADING COMPLETE", Toast.LENGTH_SHORT).show();
+    }
+
+    public void onPhotoSelected(String filename, String filenameURL) {
+        Bundle bundle = new Bundle();
+        bundle.putString("filename",filename);
+        bundle.putString("filenameURL",filenameURL);
+
+        getSupportActionBar().setTitle("Family Picture Sorting");
+        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        sortPhotosFragment = new SortPhotosFragment();
+        sortPhotosFragment.setArguments(bundle);
+        currentFragment = SORT_PHOTOS_FRAG;
+
+        ft.replace(R.id.fragment_layout, sortPhotosFragment);
+
+        ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
+        ft.commit();
     }
 }

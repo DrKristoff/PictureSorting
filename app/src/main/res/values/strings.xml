@@ -18,9 +18,9 @@
     <string name="cancel">Cancel</string>
     <string name="help_button">Guided</string>
     <string name="accept">Accept</string>
+    <string name="fileType">.jpg</string>
 
     <string-array name="eras_array">
-        <item>(?) Unknown</item>
         <item>(Pre 1983) The Early Days</item>
         <item>(1983–1986) Ryan Era</item>
         <item>(1986–1990) Kellianne Era</item>
@@ -29,6 +29,7 @@
         <item>(1998–2002) Matthew Era</item>
         <item>(2002–2006) No Ryan Era</item>
         <item>(2006–Now) Grandkids Era</item>
+        <item>Unknown Era</item>
         <item>DELETE</item>
     </string-array>
 

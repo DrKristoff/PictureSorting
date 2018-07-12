@@ -32,7 +32,6 @@ import android.widget.Toast;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import com.jsibbold.zoomage.ZoomageView;
@@ -50,7 +49,6 @@ import com.sidegigapps.dymockpictures.utils.Utils;
 import java.io.ByteArrayOutputStream;
 import java.util.Calendar;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
@@ -84,6 +82,9 @@ public class SortPhotosFragment extends Fragment implements
     private boolean mHasBacksideText = false;
     FirebaseStore fbStore;
 
+    MainActivity mActivity;
+    private String mFileType;
+
     public SortPhotosFragment() {
         // Required empty public constructor
     }
@@ -101,13 +102,14 @@ public class SortPhotosFragment extends Fragment implements
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        fbStore = ((MainActivity)getActivity()).getFbStore();
         mStorageRef = FirebaseStorage.getInstance().getReference();
         guideHelper = new GuidedSelectionHelper(
                 fbStore.getAnchorMap(),
                 getActivity().getResources().getStringArray(R.array.eras_array),
                 getActivity().getResources().getStringArray(R.array.era_dates_array)
         );
+
+        mFileType = mActivity.getResources().getString(R.string.fileType);
 
         anchorUrlMap = fbStore.getAnchorUrlMap();
     }
@@ -143,7 +145,25 @@ public class SortPhotosFragment extends Fragment implements
         View view = inflater.inflate(R.layout.fragment_sort_photos, container, false);
 
         setupUI(view);
-        onNewImageRequested();
+
+        if(this.getArguments()!=null) {
+            String filename = this.getArguments().getString("filename");
+            String filenameURL = this.getArguments().getString("filenameURL");
+
+            if(filename==null){
+                onSaveButtonPressed();
+            } else {
+                if(filename.endsWith("_b.jpg")){
+                    mHasBacksideText = true;
+                    filename = Utils.getFrontsideString(filename);
+                } else{
+                    mHasBacksideText = fbStore.filenames.contains(Utils.getBacksideString(filename));
+                }
+
+                loadUrl(filenameURL, filename);
+            }
+        }
+
 
         return view;
 
@@ -156,9 +176,9 @@ public class SortPhotosFragment extends Fragment implements
 
         eraTextView = view.findViewById(R.id.dateTextView);
 
-        fab_new = view.findViewById(R.id.fab_new);
+        fab_new = view.findViewById(R.id.fab_save_changes);
         fab_rotate = view.findViewById(R.id.fab_rotate);
-        fab_save = view.findViewById(R.id.fab_save);
+        fab_save = view.findViewById(R.id.fab_download);
         fab_exact = view.findViewById(R.id.fab_exact);
         flip_button = view.findViewById(R.id.flip_button);
 
@@ -245,10 +265,10 @@ public class SortPhotosFragment extends Fragment implements
             public void onClick(View v) {
                 int id = v.getId();
                 switch (id) {
-                    case R.id.fab_new:
-                        onNewImageRequested();
+                    case R.id.fab_save_changes:
+                        onSaveButtonPressed();
                         break;
-                    case R.id.fab_save:
+                    case R.id.fab_download:
                         onSaveFABPressed();
                         break;
                     case R.id.fab_rotate:
@@ -456,11 +476,9 @@ public class SortPhotosFragment extends Fragment implements
     private void getNextDownloadLink(){
         Random random = new Random();
 
-
         int index = random.nextInt(fbStore.filenames.size());
         String filename = fbStore.filenames.get(index);
 
-        //TODO: detect the -b here
         if(filename.endsWith("_b.jpg")){
             mHasBacksideText = true;
             filename = Utils.getFrontsideString(filename);
@@ -512,18 +530,18 @@ public class SortPhotosFragment extends Fragment implements
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
-        } else {
-            throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
-        }
+
+        mActivity = (MainActivity)getActivity();
+
+        fbStore = mActivity.getFbStore();
+        fbStore.registerEraListener(this);
     }
 
     @Override
     public void onDetach() {
         super.onDetach();
         mListener = null;
+        fbStore.registerEraListener(null);
     }
 
     private void downloadTargetImage(final String filename, final String url) {
@@ -544,18 +562,21 @@ public class SortPhotosFragment extends Fragment implements
         }
     }
 
-    public void onNewImageRequested() {
+    public void onSaveButtonPressed() {
         if (targetImageRotation != 0f) {
             //implies that the previous image was rotated.
+            Toast.makeText(mActivity,"ATTEMPTING TO SAVE ROTATION",Toast.LENGTH_LONG).show();
             uploadBitmapToFirebase(targetFilename,targetFilenameURL,targetImageRotation);
             incrementRotations();
         }
-        targetImageRotation = 0f;
+
+
+        /*targetImageRotation = 0f;
         targetImage.setVisibility(View.INVISIBLE);
         progressBar.setVisibility(View.VISIBLE);
-        eraTextView.setText("Loading");
+        eraTextView.setText("Loading");*/
 
-        getNextDownloadLink();
+        //getNextDownloadLink();
     }
 
     public void onSaveFABPressed() {
@@ -604,17 +625,17 @@ public class SortPhotosFragment extends Fragment implements
                 rotated.compress(Bitmap.CompressFormat.JPEG, 100, baos);
                 byte[] data = baos.toByteArray();
 
-                StorageReference reference = mStorageRef.child(filename);
+                StorageReference reference = mStorageRef.child(filename + mFileType);
                 UploadTask uploadTask = reference.putBytes(data);
                 uploadTask.addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception exception) {
-                        Toast.makeText(getActivity(), "Uh oh.  There was a problem.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getActivity(), "Uh oh.  There was a problem.", Toast.LENGTH_LONG).show();
                     }
                 }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                     @Override
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                        //Toast.makeText(getActivity(), "Uploaded Successfully", Toast.LENGTH_SHORT).show();  //TODO: remove this after testing
+                        Toast.makeText(getActivity(), "Uploaded Successfully: " + filename, Toast.LENGTH_LONG).show();
                         if(downloadRequested){
                             getFirebaseDownloadURL(filename);
                      }
@@ -624,28 +645,17 @@ public class SortPhotosFragment extends Fragment implements
         });
     }
 
-    private void getFirebaseDownloadURL(final String filename) {
-        mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-            @Override
-            public void onSuccess(Uri uri) {
-                targetFilenameURL = uri.toString();
-                Log.d("download","getFirebaseDownloadURL:");
-                Log.d("download",targetFilenameURL);
-                targetFilename = filename;
-                getEraFromFireBase(targetFilename);
-                onURLDownloaded();
-                if(downloadRequested){
-                    downloadTargetImage(filename,targetFilenameURL);
-                    downloadRequested = false;
-                }
-            }
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                Log.d("download", "FAILED");
-                Log.d("download", exception.getMessage());
-            }
-        });
+    private void loadUrl(String url, String filename){
+        Log.d("download","getFirebaseDownloadURL:");
+        Log.d("download",url);
+        targetFilename = filename;
+        targetFilenameURL = url;
+        getEraFromFireBase(targetFilename);
+        onURLDownloaded();
+        if(downloadRequested){
+            downloadTargetImage(filename,targetFilenameURL);
+            downloadRequested = false;
+        }
 
         if(mHasBacksideText){
             String backsideString = filename.substring(0,filename.length()-4) + "_b.jpg";
@@ -664,23 +674,25 @@ public class SortPhotosFragment extends Fragment implements
             });
 
         }
+    }
 
-/*        mStorageRef.child(filename).getMetadata().addOnSuccessListener(new OnSuccessListener<StorageMetadata>() {
+    private void getFirebaseDownloadURL(final String filename) {
+        mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
             @Override
-            public void onSuccess(StorageMetadata storageMetadata) {
-                // Metadata now contains the metadata for 'images/forest.jpg'
-                Log.d("RCD","success");
+            public void onSuccess(Uri uri) {
+                loadUrl(uri.toString(), filename);
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
-                // Uh-oh, an error occurred!
+                Log.d("download", "FAILED");
+                Log.d("download", exception.getMessage());
             }
-        });*/
+        });
+
     }
 
     private void getEraFromFireBase(String targetFilename) {
-        fbStore.registerEraListener(this);
         fbStore.fetchEra(targetFilename);
 
     }

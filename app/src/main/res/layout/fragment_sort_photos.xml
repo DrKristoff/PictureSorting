@@ -92,7 +92,7 @@
         android:background="@color/md_black_1000"></FrameLayout>
 
     <android.support.design.widget.FloatingActionButton
-        android:id="@+id/fab_save"
+        android:id="@+id/fab_download"
         android:layout_width="56dp"
         android:layout_height="56dp"
         android:layout_gravity="end|bottom"
@@ -115,16 +115,16 @@
         android:visibility="visible"
         app:backgroundTint="@color/colorPrimary"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintRight_toLeftOf="@id/fab_new" />
+        app:layout_constraintRight_toLeftOf="@id/fab_save_changes" />
 
     <android.support.design.widget.FloatingActionButton
-        android:id="@+id/fab_new"
+        android:id="@+id/fab_save_changes"
         android:layout_width="56dp"
         android:layout_height="56dp"
         android:layout_gravity="end|bottom"
         android:layout_margin="16dp"
         android:scaleType="center"
-        android:src="@drawable/ic_new_logo"
+        android:src="@drawable/ic_accept"
         android:visibility="visible"
         app:backgroundTint="@color/colorPrimary"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -141,7 +141,7 @@
         android:visibility="visible"
         app:backgroundTint="@color/colorPrimary"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintRight_toLeftOf="@id/fab_save" />
+        app:layout_constraintRight_toLeftOf="@id/fab_download" />
 
    <!-- <com.github.clans.fab.FloatingActionMenu
         android:id="@+id/fab_sort"
