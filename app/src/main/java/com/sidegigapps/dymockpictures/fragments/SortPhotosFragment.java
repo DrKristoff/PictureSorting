@@ -1,26 +1,22 @@
 package com.sidegigapps.dymockpictures.fragments;
 
-import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.DatePickerDialog;
-import android.app.DownloadManager;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.FrameLayout;
@@ -33,11 +29,7 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
-import com.google.firebase.storage.UploadTask;
 import com.jsibbold.zoomage.ZoomageView;
-import com.nostra13.universalimageloader.core.ImageLoader;
-import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
-import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
 import com.sidegigapps.dymockpictures.GlideApp;
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
@@ -46,7 +38,6 @@ import com.sidegigapps.dymockpictures.models.GuidedSelectionHelper;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 import com.sidegigapps.dymockpictures.utils.Utils;
 
-import java.io.ByteArrayOutputStream;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
@@ -54,9 +45,9 @@ import java.util.Random;
 
 public class SortPhotosFragment extends Fragment implements
         EraDialogFragment.OnEraSelectionListener,
-        FirebaseStore.EraDownloadListener{
+        FirebaseStore.EraDownloadListener,
+FirebaseStore.UploadDownloadListener{
 
-    private static final int REQUEST_CODE = 1;
     private StorageReference mStorageRef;
     private String targetFilenameURL;
     private ZoomageView targetImage, backsideImage;
@@ -74,7 +65,6 @@ public class SortPhotosFragment extends Fragment implements
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
 
-    private OnFragmentInteractionListener mListener;
     private FrameLayout bkg, guideLayout;
     private Button cancelButton, noButton, sameButton, yesButton;
     private ZoomageView guideTarget, guideComparison;
@@ -83,7 +73,6 @@ public class SortPhotosFragment extends Fragment implements
     FirebaseStore fbStore;
 
     MainActivity mActivity;
-    private String mFileType;
 
     public SortPhotosFragment() {
         // Required empty public constructor
@@ -109,23 +98,8 @@ public class SortPhotosFragment extends Fragment implements
                 getActivity().getResources().getStringArray(R.array.era_dates_array)
         );
 
-        mFileType = mActivity.getResources().getString(R.string.fileType);
-
         anchorUrlMap = fbStore.getAnchorUrlMap();
     }
-
-    public void onURLDownloaded(){
-        Log.d("RCD","onURLDownloaded");
-
-        if(mHasBacksideText){
-            flip_button.setVisibility(View.VISIBLE);
-        } else {
-            flip_button.setVisibility(View.INVISIBLE);
-        }
-        progressBar.setVisibility(View.INVISIBLE);
-        displayImage();
-    }
-
 
     private void onBacksideUrlDownloaded(String url) {
         GlideApp.with(getActivity().getApplicationContext())
@@ -454,7 +428,7 @@ public class SortPhotosFragment extends Fragment implements
         int month = c.get(Calendar.MONTH);
         int day = c.get(Calendar.DAY_OF_MONTH);
 
-        DatePickerDialog datePickerDialog = new DatePickerDialog(getActivity(),
+        DatePickerDialog datePickerDialog = new DatePickerDialog(mActivity,
                 new DatePickerDialog.OnDateSetListener() {
 
                     @Override
@@ -486,7 +460,7 @@ public class SortPhotosFragment extends Fragment implements
             mHasBacksideText = fbStore.filenames.contains(Utils.getBacksideString(filename));
         }
 
-        getFirebaseDownloadURL(filename);
+        fbStore.getFirebaseDownloadURL(filename);
     }
 
     private void displayImage() {
@@ -510,21 +484,7 @@ public class SortPhotosFragment extends Fragment implements
 
         targetImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
 
-        incrementViews();
-    }
-
-    private void incrementViews() {
         fbStore.incrementViews();
-    }
-
-    private void incrementRotations() {
-        fbStore.incrementRotations();
-    }
-
-    public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction(uri);
-        }
     }
 
     @Override
@@ -537,51 +497,39 @@ public class SortPhotosFragment extends Fragment implements
         fbStore.registerEraListener(this);
     }
 
+
+    public void onURLDownloaded(){
+        Log.d("RCD","onURLDownloaded");
+
+        if(mHasBacksideText){
+            flip_button.setVisibility(View.VISIBLE);
+        } else {
+            flip_button.setVisibility(View.INVISIBLE);
+        }
+        progressBar.setVisibility(View.INVISIBLE);
+        displayImage();
+    }
+
+
     @Override
     public void onDetach() {
         super.onDetach();
-        mListener = null;
         fbStore.registerEraListener(null);
-    }
-
-    private void downloadTargetImage(final String filename, final String url) {
-        if (getActivity().checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-            Log.v("RCD", "Permission is granted");
-            Log.v("RCD", "Attemping download of " +url);
-
-
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-
-            DownloadManager dm = (DownloadManager) getActivity().getSystemService(getActivity().DOWNLOAD_SERVICE);
-            dm.enqueue(request);
-
-        } else {
-            ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CODE);
-        }
     }
 
     public void onSaveButtonPressed() {
         if (targetImageRotation != 0f) {
             //implies that the previous image was rotated.
-            Toast.makeText(mActivity,"ATTEMPTING TO SAVE ROTATION",Toast.LENGTH_LONG).show();
-            uploadBitmapToFirebase(targetFilename,targetFilenameURL,targetImageRotation);
-            incrementRotations();
+            Toast.makeText(mActivity,"Saving Rotation",Toast.LENGTH_LONG).show();
+            fbStore.uploadBitmapToFirebase(getActivity(), targetFilename,targetFilenameURL,targetImageRotation);
+        } else {
+            //TODO:  navigate back to View Fragment
         }
-
-
-        /*targetImageRotation = 0f;
-        targetImage.setVisibility(View.INVISIBLE);
-        progressBar.setVisibility(View.VISIBLE);
-        eraTextView.setText("Loading");*/
-
-        //getNextDownloadLink();
     }
 
     public void onSaveFABPressed() {
         downloadRequested = true;
-        uploadBitmapToFirebase(targetFilename,targetFilenameURL,targetImageRotation);
+        fbStore.uploadBitmapToFirebase(getActivity(), targetFilename,targetFilenameURL,targetImageRotation);
         targetImageRotation = 0f;
         Toast.makeText(getActivity(), "Saving Image", Toast.LENGTH_SHORT).show();
         fbStore.incrementDownloads();
@@ -608,43 +556,6 @@ public class SortPhotosFragment extends Fragment implements
 
     }
 
-    private void uploadBitmapToFirebase(final String filename, final String url, final float rotation) {
-
-        ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(getActivity())
-                .build();
-        ImageLoader.getInstance().init(config);
-        ImageLoader imageLoader = ImageLoader.getInstance();
-
-        imageLoader.loadImage(url, new SimpleImageLoadingListener() {
-            @Override
-            public void onLoadingComplete(String imageUri, View view, Bitmap loadedImage) {
-                RotateTransformation transformation = new RotateTransformation(getActivity(), rotation);
-                Bitmap rotated = transformation.transform(loadedImage);
-
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                rotated.compress(Bitmap.CompressFormat.JPEG, 100, baos);
-                byte[] data = baos.toByteArray();
-
-                StorageReference reference = mStorageRef.child(filename + mFileType);
-                UploadTask uploadTask = reference.putBytes(data);
-                uploadTask.addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception exception) {
-                        Toast.makeText(getActivity(), "Uh oh.  There was a problem.", Toast.LENGTH_LONG).show();
-                    }
-                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
-                    @Override
-                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                        Toast.makeText(getActivity(), "Uploaded Successfully: " + filename, Toast.LENGTH_LONG).show();
-                        if(downloadRequested){
-                            getFirebaseDownloadURL(filename);
-                     }
-                    }
-                });
-            }
-        });
-    }
-
     private void loadUrl(String url, String filename){
         Log.d("download","getFirebaseDownloadURL:");
         Log.d("download",url);
@@ -653,7 +564,7 @@ public class SortPhotosFragment extends Fragment implements
         getEraFromFireBase(targetFilename);
         onURLDownloaded();
         if(downloadRequested){
-            downloadTargetImage(filename,targetFilenameURL);
+            fbStore.downloadTargetImage(getActivity(), filename,targetFilenameURL);
             downloadRequested = false;
         }
 
@@ -676,22 +587,6 @@ public class SortPhotosFragment extends Fragment implements
         }
     }
 
-    private void getFirebaseDownloadURL(final String filename) {
-        mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-            @Override
-            public void onSuccess(Uri uri) {
-                loadUrl(uri.toString(), filename);
-            }
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                Log.d("download", "FAILED");
-                Log.d("download", exception.getMessage());
-            }
-        });
-
-    }
-
     private void getEraFromFireBase(String targetFilename) {
         fbStore.fetchEra(targetFilename);
 
@@ -709,7 +604,7 @@ public class SortPhotosFragment extends Fragment implements
 
     private void onEraSelected(String era) {
         fbStore.incrementSorts();
-        String date = getDateFromEra(era,getActivity());
+        String date = Utils.getDateFromEra(era,getActivity());
         eraTextView.setText(era);
         fbStore.updateImageDate(targetFilename,date);
         fbStore.updateImageEra(targetFilename,era);
@@ -723,7 +618,7 @@ public class SortPhotosFragment extends Fragment implements
     }
 
     private void onDateSelected(String date){
-        String era = getEraFromDate(date);
+        String era = Utils.getEraFromDate(date, mActivity);
         eraTextView.setText(era);
         fbStore.updateImageDate(targetFilename,date);
         fbStore.updateImageEra(targetFilename,era);
@@ -740,51 +635,18 @@ public class SortPhotosFragment extends Fragment implements
         onEraReceivedFromFirebase(era);
     }
 
-    public interface OnFragmentInteractionListener {
-        void onFragmentInteraction(Uri uri);
+    @Override
+    public void onUrlReceived(String url, String filename) {
+        loadUrl(url, filename);
     }
 
-    public String getEraFromDate(String date) {
-        //"mm/dd/yyyy" > "Era Name"
+    @Override
+    public void onUploadComplete(String filename) {
 
-        int numericalDate = convertDateToInt(date);
-
-        Log.d("RCD","Finding ERA from " + date);
-        String [] era_dates = getActivity().getResources().getStringArray(R.array.era_dates_array);
-        String [] era_strings = getActivity().getResources().getStringArray(R.array.eras_array);
-
-        int chosen_era_index = 0;
-
-        for(int i = 0; i<era_dates.length;i++) {
-            int compareDate = convertDateToInt(era_dates[i]);
-            if (compareDate < numericalDate) {
-                chosen_era_index = i;
-            }
+        if(downloadRequested){
+            fbStore.getFirebaseDownloadURL(filename);
         }
 
-        Log.d("RCD","FOUND " + era_strings[chosen_era_index]);
-        return era_strings[chosen_era_index];
     }
 
-    public int convertDateToInt(String date){
-        Log.d("RCD","attempting conversion of " + date);
-        String[] dateParts = date.split("-");
-        return Integer.parseInt(dateParts[2])*10000 +
-                Integer.parseInt(dateParts[0])*100 +
-                Integer.parseInt(dateParts[1]);
-    }
-
-    public String getDateFromEra(String era, Context context){
-        String [] era_dates = context.getResources().getStringArray(R.array.era_dates_array);
-        String [] era_strings = context.getResources().getStringArray(R.array.eras_array);
-
-        for(int i=0;i<era_dates.length;i++){
-            if(era.equals(era_strings[i])){
-                return era_dates[i];
-            }
-        }
-
-        return era_dates[0];
-
-    }
 }

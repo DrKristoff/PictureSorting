@@ -39,7 +39,6 @@ import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 import com.sidegigapps.dymockpictures.models.FirebaseStore;
 
 public class MainActivity extends AppCompatActivity implements
-        SortPhotosFragment.OnFragmentInteractionListener,
         FirebaseStore.InitializationListener {
 
     private static final String VIEW_PHOTOS_FRAG = "view_photos_fragment";
@@ -157,10 +156,6 @@ public class MainActivity extends AppCompatActivity implements
                 .show();
     }
 
-    @Override
-    public void onFragmentInteraction(Uri uri) {
-    }
-
     private void onConnected(GoogleSignInAccount acct) {
         Log.d(TAG, "onConnected(): connected to Google APIs");
         String uuid = acct.getId();
@@ -271,9 +266,13 @@ public class MainActivity extends AppCompatActivity implements
     private void viewPhotos() {
         Log.d("RCD", "viewPhotos");
         getSupportActionBar().setTitle("Family Pictures");
+
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         viewPhotosFragment = new ViewPhotosFragment();
 
+        if(currentFragment==SORT_PHOTOS_FRAG){
+            ft.remove(sortPhotosFragment);
+        }
         ft.replace(R.id.fragment_layout, viewPhotosFragment);
         currentFragment = VIEW_PHOTOS_FRAG;
 

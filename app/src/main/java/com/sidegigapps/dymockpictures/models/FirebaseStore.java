@@ -1,9 +1,18 @@
 package com.sidegigapps.dymockpictures.models;
 
+import android.Manifest;
+import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
 import android.util.Log;
+import android.view.View;
+import android.widget.Toast;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -16,11 +25,17 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
+import com.nostra13.universalimageloader.core.ImageLoader;
+import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
+import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
+import com.sidegigapps.dymockpictures.utils.RotateTransformation;
 
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -36,31 +51,15 @@ public class FirebaseStore {
     private DatabaseReference mDatabase;
     private GoogleSignInAccount mGoogleSignInAccount;
 
+
+    private static final int REQUEST_CODE = 1;
+
+    private String mFileType = ".jpg";
+    private String backsideSuffic = "_b";
     private static final String LEADERBOARDS = "leaderboards";
     private static final String USERS = "users";
     private static final String IMAGES = "images";
     private DatabaseReference mUsersReference, mLeaderboardReference, mImagesReference;
-
-    private HashMap<String, Leaderboard> mLeaderboardsMap = new HashMap<>();
-    private HashMap<String, UserData> mUsersMap = new HashMap<>();
-
-    private UserData mUserData;
-    public boolean mUserDataLoaded = false;
-    public boolean mLeaderboardDataLoaded = false;
-    private boolean mSetupComplete = false;
-
-    public static final String LEADERBOARD_VIEWS = "Views";
-    public static final String LEADERBOARD_ROTATIONS = "Rotations";
-    public static final String LEADERBOARD_SORTED = "Sorted";
-    public static final String LEADERBOARD_TRANSCRIBED = "Transcribed";
-    public static final String LEADERBOARD_DOWNLOADS = "Downloads";
-    public final String[] leaderboardNames = new String[]{
-            LEADERBOARD_VIEWS,
-            LEADERBOARD_ROTATIONS,
-            LEADERBOARD_SORTED,
-            //LEADERBOARD_TRANSCRIBED,
-            LEADERBOARD_DOWNLOADS
-    };
 
     private HashMap<Integer,String> anchorMap = new HashMap<>();
     private HashMap<String,String> anchorUrlMap = new HashMap<>();
@@ -69,18 +68,16 @@ public class FirebaseStore {
     private HashMap<String,String> filenamesUrlMap = new HashMap<>();
 
 
-    InitializationListener initializationListener;
-    UrlDownloadListener mUrlListener;
-
     public FirebaseStore(GoogleSignInAccount acct, InitializationListener initListener){
         this.mGoogleSignInAccount = acct;
         this.initializationListener = initListener;
-        initializeDatabase();
+        initDatabase();
+        initLeaderboards();
         loadImageData();
 
     }
 
-    private void initializeDatabase(){
+    private void initDatabase(){
         mAuth = FirebaseAuth.getInstance();
         mStorageRef = FirebaseStorage.getInstance().getReference();
         mDatabase = FirebaseDatabase.getInstance().getReference();
@@ -89,80 +86,16 @@ public class FirebaseStore {
         mImagesReference = mDatabase.child(IMAGES);
     }
 
-    private void loadUserData() {
-        Log.d("RCD", "loadUserData");
-        mUsersReference.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                if (snapshot.child(mGoogleSignInAccount.getId()).exists()) {
-                    Log.d("RCD", "account already exists: " + mGoogleSignInAccount.getId());
-                    HashMap<String, Object> map = (HashMap<String, Object>) snapshot.getValue();
-                    mUserData = new UserData(map, mGoogleSignInAccount.getId());
-                } else {
-                    Log.d("RCD", "account does not exist: " + mGoogleSignInAccount.getId());
-                    mUserData = new UserData(mGoogleSignInAccount);
-                    mUsersReference.child(mUserData.uuid).setValue(mUserData);
-                    Log.d("RCD", "user created");
-                }
-
-                for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                    HashMap<String, Object> childMap = (HashMap<String, Object>) childSnapshot.getValue();
-                    UserData userData = new UserData(childMap);
-                    mUsersMap.put(userData.getUuid(), userData);
-                }
-
-                mUserDataLoaded = true;
-                onUserDataLoaded();
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });
-
+    LeaderboardStore leaderboards;
+    private void initLeaderboards(){
+        leaderboards = new LeaderboardStore(mLeaderboardReference, mUsersReference, mGoogleSignInAccount);
     }
+
 
     public HashMap<String, Leaderboard> getmLeaderboardsMap() {
-        return mLeaderboardsMap;
+        return leaderboards.getLeaderboardsMap();
     }
 
-    private void onUserDataLoaded() {
-        Log.d("RCD", "onUserDataLoaded");
-        setupLeaderboardListener();
-    }
-
-    private void setupLeaderboardListener() {
-        Log.d("RCD", "setupLeaderboardListener");
-
-        mLeaderboardReference.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                for (String leaderboardName : leaderboardNames) {
-                    if (snapshot.child(leaderboardName).exists()) {
-                        HashMap<String, Long> map = (HashMap<String, Long>) snapshot.child(leaderboardName).getValue();
-                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName, map);
-                        mLeaderboardsMap.put(leaderboardName, newLeaderboard);
-                    } else {
-                        Log.d("RCD", "leaderboard does not exist: " + leaderboardName);
-                        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(0);  //race conditions, mUserData was still null
-                        Leaderboard newLeaderboard = new Leaderboard(leaderboardName);
-                        mLeaderboardsMap.put(leaderboardName, newLeaderboard);
-                    }
-                }
-
-                if (!mLeaderboardDataLoaded) {
-                    onLeaderboardDataLoaded();
-                    mLeaderboardDataLoaded = true;
-                }
-
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        });
-
-    }
 
 
     public ArrayList<String> getImageUrlsByEra(String era){
@@ -188,38 +121,27 @@ public class FirebaseStore {
     }
 
     public UserData getUserDataByUUID(String uuid) {
-        return mUsersMap.get(uuid);
+        return leaderboards.getUserDataByUUID(uuid);
     }
 
     public void incrementRotations() {
-        incrementScores(LEADERBOARD_ROTATIONS);
+        leaderboards.incrementScores(leaderboards.LEADERBOARD_ROTATIONS);
     }
 
     public void incrementViews() {
-        incrementScores(LEADERBOARD_VIEWS);
+        leaderboards.incrementScores(leaderboards.LEADERBOARD_VIEWS);
     }
 
     public void incrementSorts() {
-        incrementScores(LEADERBOARD_SORTED);
+        leaderboards.incrementScores(leaderboards.LEADERBOARD_SORTED);
     }
 
     public void incrementTranscribes() {
-        incrementScores(LEADERBOARD_TRANSCRIBED);
+        leaderboards.incrementScores(leaderboards.LEADERBOARD_TRANSCRIBED);
     }
 
     public void incrementDownloads() {
-        incrementScores(LEADERBOARD_DOWNLOADS);
-    }
-
-    public void incrementScores(String leaderboardName) {
-        Leaderboard leaderboard = mLeaderboardsMap.get(leaderboardName);
-        long score = leaderboard.getScoreByUUID(mUserData.uuid);
-        score += 1;
-        mLeaderboardReference.child(leaderboardName).child(mUserData.uuid).setValue(score);
-
-        Log.d("RCD", "UPDATING " + leaderboardName);
-        Log.d("RCD", "NOW " + String.valueOf(score));
-
+        leaderboards.incrementScores(leaderboards.LEADERBOARD_DOWNLOADS);
     }
 
 
@@ -227,7 +149,6 @@ public class FirebaseStore {
         Log.d("RCD", "onFileNamesLoaded");
         Log.d("RCD", "Filenames loaded successfully");
         Log.d("RCD", "There are " + String.valueOf(filenames.size()) + " files");
-        loadUserData();
         loadAnchorData();
     }
 
@@ -292,7 +213,7 @@ public class FirebaseStore {
                     String url = uri.toString();
                     Log.d("FirebaseStore","received: " + fileWithType);
                     if(mUrlListener!=null){
-                        mUrlListener.onUrlDownloaded(filename,url);
+                        mUrlListener.onUrlReceived(filename,url);
                     }
 
 
@@ -300,22 +221,7 @@ public class FirebaseStore {
             });
         }
 
-        mUrlListener.onAllDownloadsComplete();
-    }
-
-    @Nullable
-    public void registerUrlListener(UrlDownloadListener listener) {
-        mUrlListener = listener;
-    }
-
-    public void registerEraListener(EraDownloadListener listener) {
-        mEraListener = listener;
-    }
-
-    public interface UrlDownloadListener{
-        void onUrlDownloaded(String filename, String url);
-        void onAllDownloadsComplete();
-        void onEraSetupComplete();
+        mUrlListener.onAllUrlsReceived();
     }
 
     public ArrayList<String> getFilenamesByEra(String era, boolean includeBackside) {
@@ -459,6 +365,110 @@ public class FirebaseStore {
             }
         });
     }
+
+    public void getFirebaseDownloadURL(final String filename) {
+        mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+            @Override
+            public void onSuccess(Uri uri) {
+                mUpDownListener.onUrlReceived(uri.toString(), filename);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                Log.d("download", "FAILED");
+                Log.d("download", exception.getMessage());
+            }
+        });
+
+    }
+
+
+    public void downloadTargetImage(Activity activity, final String filename, final String url) {
+        if (activity.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            Log.v("RCD", "Permission is granted");
+            Log.v("RCD", "Attemping download of " +url);
+
+
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+
+            DownloadManager dm = (DownloadManager) activity.getSystemService(activity.DOWNLOAD_SERVICE);
+            dm.enqueue(request);
+
+        } else {
+            ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CODE);
+        }
+    }
+
+    public void uploadBitmapToFirebase(final Activity activity, final String filename, final String url, final float rotation) {
+
+        incrementRotations();
+
+        ImageLoaderConfiguration config = new ImageLoaderConfiguration.Builder(activity)
+                .build();
+        ImageLoader.getInstance().init(config);
+        ImageLoader imageLoader = ImageLoader.getInstance();
+
+        imageLoader.loadImage(url, new SimpleImageLoadingListener() {
+            @Override
+            public void onLoadingComplete(String imageUri, View view, Bitmap loadedImage) {
+                RotateTransformation transformation = new RotateTransformation(activity, rotation);
+                Bitmap rotated = transformation.transform(loadedImage);
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                rotated.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+                byte[] data = baos.toByteArray();
+
+                StorageReference reference = mStorageRef.child(filename + mFileType);
+                UploadTask uploadTask = reference.putBytes(data);
+                uploadTask.addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        Toast.makeText(activity, "Uh oh.  There was a problem.", Toast.LENGTH_LONG).show();
+                    }
+                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                        Toast.makeText(activity, "Uploaded Successfully: " + filename, Toast.LENGTH_LONG).show();
+
+                        mUpDownListener.onUploadComplete(filename);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Interfaces and Listeners
+     */
+
+
+    InitializationListener initializationListener;
+    UrlReceivedListener mUrlListener;
+    UploadDownloadListener mUpDownListener;
+
+    @Nullable
+    public void registerUrlListener(UrlReceivedListener listener, UploadDownloadListener uploadDownloadListener) {
+        mUrlListener = listener;
+        mUpDownListener = uploadDownloadListener;
+    }
+
+    public void registerEraListener(EraDownloadListener listener) {
+        mEraListener = listener;
+    }
+
+    public interface UrlReceivedListener {
+        void onUrlReceived(String filename, String url);
+        void onAllUrlsReceived();
+        void onEraSetupComplete();
+    }
+
+    public interface UploadDownloadListener {
+        void onUrlReceived(String url, String filename);
+        void onUploadComplete(String filename);
+    }
+
 
     EraDownloadListener mEraListener;
     public interface EraDownloadListener {

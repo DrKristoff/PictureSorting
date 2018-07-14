@@ -23,12 +23,12 @@ import com.sidegigapps.dymockpictures.PhotoGridViewAdapter;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.models.FirebaseStore;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class ViewPhotosFragment extends Fragment implements
-        FirebaseStore.UrlDownloadListener{
+        FirebaseStore.UrlReceivedListener,
+        FirebaseStore.UploadDownloadListener{
 
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
@@ -41,7 +41,7 @@ public class ViewPhotosFragment extends Fragment implements
 
     FirebaseStore fbStore;
 
-    private String [] eras;
+    private String[] eras;
 
     int viewPhotoBatchSize = 50;
     int numBatchesToShow = 0;
@@ -64,6 +64,9 @@ public class ViewPhotosFragment extends Fragment implements
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        eras = getActivity().getResources().getStringArray(R.array.eras_array);
+        mEra = eras[1];
     }
 
     @Override
@@ -71,9 +74,6 @@ public class ViewPhotosFragment extends Fragment implements
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_photo_gallery, container, false);
-
-        eras = getActivity().getResources().getStringArray(R.array.eras_array);
-        mEra = eras[1];
 
         mGridview = view.findViewById(R.id.photo_gridview);
         mAdapter = new PhotoGridViewAdapter(getActivity(), new ArrayList<String>());
@@ -83,11 +83,10 @@ public class ViewPhotosFragment extends Fragment implements
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 ClipboardManager clipboard = (ClipboardManager) mActivity.getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("photo", (String)mAdapter.getItem(position));
+                ClipData clip = ClipData.newPlainText("photo", (String) mAdapter.getItem(position));
                 clipboard.setPrimaryClip(clip);
 
-                Toast.makeText(mActivity,mAdapter.getFilename(position) + " Copied to clipboard",Toast.LENGTH_SHORT).show();
-                mActivity.onPhotoSelected(mAdapter.getFilename(position),(String)mAdapter.getItem(position));
+                mActivity.onPhotoSelected(mAdapter.getFilename(position), (String) mAdapter.getItem(position));
             }
         });
 
@@ -108,7 +107,7 @@ public class ViewPhotosFragment extends Fragment implements
 
             @Override
             public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
-                if(firstVisibleItem + visibleItemCount >= totalItemCount){
+                if (firstVisibleItem + visibleItemCount >= totalItemCount) {
                     mButton.setVisibility(View.VISIBLE);
                 } else {
                     mButton.setVisibility(View.GONE);
@@ -149,8 +148,8 @@ public class ViewPhotosFragment extends Fragment implements
         int count = mAdapter.getCount();
         ArrayList<String> eraFilenames = fbStore.getFilenamesByEra(mEra, false);
         int maxImages = eraFilenames.size();
-        Log.d("RCD", String.format("Currently showing %01d images, total in this era %01d",count,maxImages));
-        if(count>=maxImages){
+        Log.d("RCD", String.format("Currently showing %01d images, total in this era %01d", count, maxImages));
+        if (count >= maxImages) {
             Snackbar.make(mActivity.findViewById(android.R.id.content),
                     "No more photos to load",
                     Snackbar.LENGTH_SHORT).show();
@@ -160,41 +159,48 @@ public class ViewPhotosFragment extends Fragment implements
         areDownloadsComplete = false;
         numBatchesToShow++;
 
-        Log.d("RCD","Requesting: " + String.valueOf(numBatchesToShow*viewPhotoBatchSize));
+        Log.d("RCD", "Requesting: " + String.valueOf(numBatchesToShow * viewPhotoBatchSize));
 
-        int listSize = Math.min(maxImages,numBatchesToShow*viewPhotoBatchSize);
+        int listSize = Math.min(maxImages, numBatchesToShow * viewPhotoBatchSize);
 
-        Log.d("RCD","Found: " + String.valueOf(listSize));
-        ArrayList<String> result = new ArrayList<>(eraFilenames.subList(0,listSize));
+        Log.d("RCD", "Found: " + String.valueOf(listSize));
+        ArrayList<String> result = new ArrayList<>(eraFilenames.subList(0, listSize));
 
         fbStore.loadFilenamesUrls(result);
     }
 
     @Override
-    public void onUrlDownloaded(String filename, String url) {
-        if(!filename.endsWith("_b")) {
+    public void onUrlReceived(String filename, String url) {
+        if (!filename.endsWith("_b")) {
             addImageURL(url, filename);
         }
     }
 
     @Override
-    public void onAllDownloadsComplete() {
+    public void onUploadComplete(String filename) {
+        
+    }
+
+    @Override
+    public void onAllUrlsReceived() {
         areDownloadsComplete = true;
     }
 
     @Override
     public void onEraSetupComplete() {
-        loadMorePhotos();
+        if (mAdapter.getCount() == 0) {
+            loadMorePhotos();
+        }
     }
 
-    public void addImageURL(String url, String filename){
-        Log.d("DYMOCK",url);
+    public void addImageURL(String url, String filename) {
+        Log.d("DYMOCK", url);
         mAdapter.add(url);
         mAdapter.addFilename(filename);
         mAdapter.notifyDataSetChanged();
     }
 
-    public void clearAdapter(){
+    public void clearAdapter() {
         PhotoGridViewAdapter adapter = (PhotoGridViewAdapter) mGridview.getAdapter();
         adapter.clear();
         adapter.notifyDataSetChanged();
@@ -203,16 +209,16 @@ public class ViewPhotosFragment extends Fragment implements
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        mActivity = (MainActivity)getActivity();
+        mActivity = (MainActivity) getActivity();
 
         fbStore = mActivity.getFbStore();
-        fbStore.registerUrlListener(this);
+        fbStore.registerUrlListener(this, this);
     }
 
     @Override
     public void onDetach() {
         super.onDetach();
-        fbStore.registerUrlListener(null);
+        fbStore.registerUrlListener(null, null);
     }
 
     public void resetBatchCount() {

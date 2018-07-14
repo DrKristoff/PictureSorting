@@ -19,6 +19,7 @@ import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.models.FirebaseStore;
 import com.sidegigapps.dymockpictures.models.Leaderboard;
+import com.sidegigapps.dymockpictures.models.LeaderboardStore;
 import com.sidegigapps.dymockpictures.models.UserData;
 
 import java.util.HashMap;
@@ -32,7 +33,7 @@ public class LeaderboardFragment extends Fragment {
     private HashMap<String, Leaderboard> leaderboardsMap;
 
 
-    FirebaseStore fbStore;
+    FirebaseStore fb;
 
 
     private RecyclerView mRecyclerView;
@@ -67,7 +68,7 @@ public class LeaderboardFragment extends Fragment {
         super.onCreate(savedInstanceState);
 
 
-        fbStore = ((MainActivity)getActivity()).getFbStore();
+        fb = ((MainActivity)getActivity()).getFbStore();
 
     }
 
@@ -91,7 +92,7 @@ public class LeaderboardFragment extends Fragment {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 getActivity(),
                 R.layout.spinner_item,
-                fbStore.leaderboardNames
+                LeaderboardStore.leaderboardNames
         );
 
         spinner.setAdapter(adapter);
@@ -111,7 +112,7 @@ public class LeaderboardFragment extends Fragment {
 
 
 
-        showLeaderboard(fbStore.LEADERBOARD_VIEWS);
+        showLeaderboard(LeaderboardStore.LEADERBOARD_VIEWS);
 
         return view;
     }
@@ -160,7 +161,7 @@ public class LeaderboardFragment extends Fragment {
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
             String uuid = mLeaderboard.getUUIDByLeaderboardPosition(position);
-            UserData userData = fbStore.getUserDataByUUID(uuid);
+            UserData userData = fb.getUserDataByUUID(uuid);
             if (userData==null) return;
 
             holder.mNameTextView.setText(userData.getName());
