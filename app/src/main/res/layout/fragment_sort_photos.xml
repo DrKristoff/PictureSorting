@@ -115,20 +115,27 @@
         android:visibility="visible"
         app:backgroundTint="@color/colorPrimary"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintRight_toLeftOf="@id/fab_save_changes" />
+        app:layout_constraintRight_toLeftOf="@id/fabProgressCircle" />
 
-    <android.support.design.widget.FloatingActionButton
-        android:id="@+id/fab_save_changes"
+    <com.github.jorgecastilloprz.FABProgressCircle
+        android:id="@+id/fabProgressCircle"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
         android:layout_width="56dp"
         android:layout_height="56dp"
         android:layout_gravity="end|bottom"
         android:layout_margin="16dp"
-        android:scaleType="center"
-        android:src="@drawable/ic_accept"
-        android:visibility="visible"
-        app:backgroundTint="@color/colorPrimary"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintRight_toRightOf="parent" />
+        >
+        <android.support.design.widget.FloatingActionButton
+            android:id="@+id/fab_save_changes"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="center"
+            android:src="@drawable/ic_accept"
+            android:visibility="visible"
+            app:backgroundTint="@color/colorPrimary" />
+    </com.github.jorgecastilloprz.FABProgressCircle>
+
 
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/fab_exact"

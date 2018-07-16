@@ -17,6 +17,7 @@ public class PhotoGridViewAdapter extends ArrayAdapter {
     private LayoutInflater inflater;
 
     private ArrayList<String> filenames = new ArrayList<>();
+    private ArrayList<String> urls = new ArrayList<>();
 
     public PhotoGridViewAdapter(Context context, ArrayList<String> imageUrls) {
         super(context, R.layout.photo_grid_imageview, imageUrls);
@@ -34,15 +35,24 @@ public class PhotoGridViewAdapter extends ArrayAdapter {
         filenames.add(filename);
     }
 
+    public ArrayList<String> getFilenames() {
+        return filenames;
+    }
+
+    public ArrayList<String> getUrls() {
+        return urls;
+    }
     @Override
     public void add(@Nullable Object object) {
         super.add(object);
+        urls.add((String)object);
     }
 
     @Override
     public void clear() {
         super.clear();
         filenames.clear();
+        urls.clear();
     }
 
     @Override

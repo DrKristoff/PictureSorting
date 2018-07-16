@@ -30,6 +30,7 @@ import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
 import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
 import com.sidegigapps.dymockpictures.utils.RotateTransformation;
+import com.sidegigapps.dymockpictures.utils.Utils;
 
 import org.apache.commons.io.FilenameUtils;
 
@@ -96,6 +97,15 @@ public class FirebaseStore {
         return leaderboards.getLeaderboardsMap();
     }
 
+    public void addImageToEra(String filename, String newEra, String oldEra){
+        ArrayList<String> newEraList = mEraFilenames.get(newEra);
+        ArrayList<String> oldEraList = mEraFilenames.get(newEra);
+        if(newEraList!=null){
+            newEraList.add(filename);
+            int index = oldEraList.indexOf(filename);
+            oldEraList.remove(index);
+        }
+    }
 
 
     public ArrayList<String> getImageUrlsByEra(String era){
@@ -150,6 +160,31 @@ public class FirebaseStore {
         Log.d("RCD", "Filenames loaded successfully");
         Log.d("RCD", "There are " + String.valueOf(filenames.size()) + " files");
         loadAnchorData();
+
+        //check each era for filename, if not found place in unknown
+        ArrayList<String> unknownList = mEraFilenames.get("Unknown Era");
+        if(unknownList==null) {
+            mEraFilenames.put("Unknown Era",new ArrayList<String>());
+            unknownList = mEraFilenames.get("Unknown Era");
+        }
+        assert(unknownList!=null);
+        Log.d("RCD","size of filenames: " + String.valueOf(filenames.size()));
+        for (String filename : filenames){
+            filename = Utils.removeFileType(filename);
+            boolean found = false;
+            for(String era : mEraFilenames.keySet()){
+                ArrayList<String> files = mEraFilenames.get(era);
+                if(files.contains(filename)){
+                    found = true;
+                    continue;
+                }
+            }
+            if(!found){
+                unknownList.add(filename);
+            }
+        }
+
+
     }
 
     private void loadAnchorData() {
@@ -202,7 +237,7 @@ public class FirebaseStore {
         return arrayList.toArray(new String[arrayList.size()]);
     }
 
-    public void loadFilenamesUrls(ArrayList<String> imageFilenames){
+    public void loadFilenamesUrls(ArrayList<String> imageFilenames, final String era){
         Log.d("FirebaseStore","loadFilenamesUrls " + String.valueOf(imageFilenames.size()));
         for(final String filename : imageFilenames){
             Log.d("FirebaseStore",filename);
@@ -213,7 +248,7 @@ public class FirebaseStore {
                     String url = uri.toString();
                     Log.d("FirebaseStore","received: " + fileWithType);
                     if(mUrlListener!=null){
-                        mUrlListener.onUrlReceived(filename,url);
+                        mUrlListener.onUrlReceived(filename,url, era);
                     }
 
 
@@ -280,14 +315,13 @@ public class FirebaseStore {
     }
 
     private void loadImageData() {
-        loadFilenames();
         loadImageEras();
         initializationListener.onInitializationComplete();
     }
 
-    private void collectImageEras(Map<String, Object> users) {
+    private void collectImageEras(Map<String, Object> images) {
         mEraFilenames = new HashMap<>();
-        for (Map.Entry<String, Object> entry : users.entrySet()){
+        for (Map.Entry<String, Object> entry : images.entrySet()){
             Log.d("RCD","test");
             String imageName = entry.getKey();
             String era = null;
@@ -308,6 +342,7 @@ public class FirebaseStore {
         }
 
         mUrlListener.onEraSetupComplete();
+        loadFilenames();
     }
 
     private void loadFilenamesFromByteString(byte[] bytes){
@@ -370,7 +405,7 @@ public class FirebaseStore {
         mStorageRef.child(filename).getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
             @Override
             public void onSuccess(Uri uri) {
-                mUpDownListener.onUrlReceived(uri.toString(), filename);
+                mUpDownListener.onDownloadUrlReceived(uri.toString(), filename);
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
@@ -413,6 +448,7 @@ public class FirebaseStore {
         imageLoader.loadImage(url, new SimpleImageLoadingListener() {
             @Override
             public void onLoadingComplete(String imageUri, View view, Bitmap loadedImage) {
+                String filenameWithType = Utils.addFileTypeIfMissing(filename);
                 RotateTransformation transformation = new RotateTransformation(activity, rotation);
                 Bitmap rotated = transformation.transform(loadedImage);
 
@@ -420,7 +456,7 @@ public class FirebaseStore {
                 rotated.compress(Bitmap.CompressFormat.JPEG, 100, baos);
                 byte[] data = baos.toByteArray();
 
-                StorageReference reference = mStorageRef.child(filename + mFileType);
+                StorageReference reference = mStorageRef.child(filenameWithType);
                 UploadTask uploadTask = reference.putBytes(data);
                 uploadTask.addOnFailureListener(new OnFailureListener() {
                     @Override
@@ -432,7 +468,9 @@ public class FirebaseStore {
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                         Toast.makeText(activity, "Uploaded Successfully: " + filename, Toast.LENGTH_LONG).show();
 
-                        mUpDownListener.onUploadComplete(filename);
+                        if(mUpDownListener!=null){
+                            mUpDownListener.onUploadComplete(filename);
+                        }
                     }
                 });
             }
@@ -459,13 +497,13 @@ public class FirebaseStore {
     }
 
     public interface UrlReceivedListener {
-        void onUrlReceived(String filename, String url);
+        void onUrlReceived(String filename, String url, String era);
         void onAllUrlsReceived();
         void onEraSetupComplete();
     }
 
     public interface UploadDownloadListener {
-        void onUrlReceived(String url, String filename);
+        void onDownloadUrlReceived(String url, String filename);
         void onUploadComplete(String filename);
     }
 

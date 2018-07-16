@@ -16,12 +16,12 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.GridView;
 import android.widget.Spinner;
-import android.widget.Toast;
 
 import com.sidegigapps.dymockpictures.MainActivity;
 import com.sidegigapps.dymockpictures.PhotoGridViewAdapter;
 import com.sidegigapps.dymockpictures.R;
 import com.sidegigapps.dymockpictures.models.FirebaseStore;
+import com.sidegigapps.dymockpictures.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,15 +35,14 @@ public class ViewPhotosFragment extends Fragment implements
 
     MainActivity mActivity;
     Spinner mSpinner;
-    GridView mGridview;
+    public GridView mGridview;
     PhotoGridViewAdapter mAdapter;
-    String mEra;
 
     FirebaseStore fbStore;
 
     private String[] eras;
 
-    int viewPhotoBatchSize = 50;
+    int viewPhotoBatchSize = 24;
     int numBatchesToShow = 0;
     private boolean areDownloadsComplete = true;
     private Button mButton;
@@ -52,21 +51,12 @@ public class ViewPhotosFragment extends Fragment implements
         // Required empty public constructor
     }
 
-    public static ViewPhotosFragment newInstance(String param1, String param2) {
-        ViewPhotosFragment fragment = new ViewPhotosFragment();
-        Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
-        fragment.setArguments(args);
-        return fragment;
-    }
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         eras = getActivity().getResources().getStringArray(R.array.eras_array);
-        mEra = eras[1];
+
     }
 
     @Override
@@ -76,7 +66,7 @@ public class ViewPhotosFragment extends Fragment implements
         View view = inflater.inflate(R.layout.fragment_photo_gallery, container, false);
 
         mGridview = view.findViewById(R.id.photo_gridview);
-        mAdapter = new PhotoGridViewAdapter(getActivity(), new ArrayList<String>());
+        mAdapter = new PhotoGridViewAdapter(mActivity,new ArrayList<String>());
         mGridview.setAdapter(mAdapter);
 
         mGridview.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -86,10 +76,9 @@ public class ViewPhotosFragment extends Fragment implements
                 ClipData clip = ClipData.newPlainText("photo", (String) mAdapter.getItem(position));
                 clipboard.setPrimaryClip(clip);
 
-                mActivity.onPhotoSelected(mAdapter.getFilename(position), (String) mAdapter.getItem(position));
+                onPhotoSelected(mAdapter.getFilename(position), (String)mAdapter.getItem(position));
             }
         });
-
 
         mButton = view.findViewById(R.id.buttonLoadMore);
         mButton.setOnClickListener(new View.OnClickListener() {
@@ -125,11 +114,7 @@ public class ViewPhotosFragment extends Fragment implements
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                mEra = eras[position];
-                resetBatchCount();
-                clearAdapter();
-                loadMorePhotos();
-
+                mActivity.setCurrentEra(eras[position]);
             }
 
             @Override
@@ -138,15 +123,36 @@ public class ViewPhotosFragment extends Fragment implements
             }
         });
 
-        resetBatchCount();
-        loadMorePhotos();
+        String currentEra = mActivity.getCurrentEra();
+        mSpinner.setSelection(Utils.getEraArrayPositionFromString(currentEra, mActivity));
+
+        mAdapter.clear();
+        if(getArguments()!=null){
+            ArrayList<String> filenames = getArguments().getStringArrayList("filenames");
+            ArrayList<String> urls = getArguments().getStringArrayList("urls");
+            if ((filenames.size() != urls.size())) throw new AssertionError();
+            for (int i = 0; i < filenames.size(); i++){
+                onUrlReceived(filenames.get(i),urls.get(i),mActivity.getCurrentEra());
+            }
+            resetBatchCount(filenames.size());
+
+
+        } else {
+            resetBatchCount(0);
+            loadMorePhotos();
+        }
 
         return view;
     }
 
+    private void onPhotoSelected(String filename, String position) {
+        mActivity.onPhotoSelected(filename, position, mAdapter.getFilenames(), mAdapter.getUrls());
+
+    }
+
     private void loadMorePhotos() {
         int count = mAdapter.getCount();
-        ArrayList<String> eraFilenames = fbStore.getFilenamesByEra(mEra, false);
+        ArrayList<String> eraFilenames = fbStore.getFilenamesByEra(mActivity.getCurrentEra(), false);
         int maxImages = eraFilenames.size();
         Log.d("RCD", String.format("Currently showing %01d images, total in this era %01d", count, maxImages));
         if (count >= maxImages) {
@@ -166,19 +172,26 @@ public class ViewPhotosFragment extends Fragment implements
         Log.d("RCD", "Found: " + String.valueOf(listSize));
         ArrayList<String> result = new ArrayList<>(eraFilenames.subList(0, listSize));
 
-        fbStore.loadFilenamesUrls(result);
+        fbStore.loadFilenamesUrls(result, mActivity.getCurrentEra());
     }
 
     @Override
-    public void onUrlReceived(String filename, String url) {
-        if (!filename.endsWith("_b")) {
-            addImageURL(url, filename);
+    public void onUrlReceived(String filename, String url, String era) {
+        if(mActivity.getCurrentEra().equals(era)) {
+            if (!filename.endsWith("_b")) {
+                addImageURL(url, filename);
+            }
         }
     }
 
     @Override
+    public void onDownloadUrlReceived(String url, String filename) {
+
+    }
+
+    @Override
     public void onUploadComplete(String filename) {
-        
+
     }
 
     @Override
@@ -195,15 +208,13 @@ public class ViewPhotosFragment extends Fragment implements
 
     public void addImageURL(String url, String filename) {
         Log.d("DYMOCK", url);
+        mAdapter = (PhotoGridViewAdapter) mGridview.getAdapter();
         mAdapter.add(url);
         mAdapter.addFilename(filename);
         mAdapter.notifyDataSetChanged();
-    }
-
-    public void clearAdapter() {
-        PhotoGridViewAdapter adapter = (PhotoGridViewAdapter) mGridview.getAdapter();
-        adapter.clear();
-        adapter.notifyDataSetChanged();
+        Log.d("RCD","COUNTS:");
+        Log.d("RCD",String.valueOf(mAdapter.getFilenames().size()));
+        Log.d("RCD",String.valueOf(mAdapter.getUrls().size()));
     }
 
     @Override
@@ -221,7 +232,17 @@ public class ViewPhotosFragment extends Fragment implements
         fbStore.registerUrlListener(null, null);
     }
 
-    public void resetBatchCount() {
-        numBatchesToShow = 1;
+    public void resetBatchCount(int currentNumberShowing) {
+        int result = currentNumberShowing / viewPhotoBatchSize;
+        numBatchesToShow = result + 1;
+    }
+
+    public void onNewEraSelected(String era) {
+        mAdapter.clear();
+        mAdapter.notifyDataSetChanged();
+        resetBatchCount(0);
+        loadMorePhotos();
+
+
     }
 }

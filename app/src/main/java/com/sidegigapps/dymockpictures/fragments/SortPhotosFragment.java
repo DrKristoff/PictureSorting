@@ -15,8 +15,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.FrameLayout;
@@ -41,7 +39,6 @@ import com.sidegigapps.dymockpictures.utils.Utils;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.Random;
 
 public class SortPhotosFragment extends Fragment implements
         EraDialogFragment.OnEraSelectionListener,
@@ -49,18 +46,14 @@ public class SortPhotosFragment extends Fragment implements
 FirebaseStore.UploadDownloadListener{
 
     private StorageReference mStorageRef;
-    private String targetFilenameURL;
     private ZoomageView targetImage, backsideImage;
     private float targetImageRotation = 0f;
-    private String targetFilename;
     private FloatingActionButton fab_rotate, fab_new, fab_save, fab_exact;
     Button flip_button;
     private ProgressBar progressBar;
     private TextView eraTextView;
 
     GuidedSelectionHelper guideHelper;
-
-    private boolean downloadRequested = false;
 
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
@@ -73,6 +66,8 @@ FirebaseStore.UploadDownloadListener{
     FirebaseStore fbStore;
 
     MainActivity mActivity;
+    private String mFilename;
+    private String mFilenameURL;
 
     public SortPhotosFragment() {
         // Required empty public constructor
@@ -121,20 +116,20 @@ FirebaseStore.UploadDownloadListener{
         setupUI(view);
 
         if(this.getArguments()!=null) {
-            String filename = this.getArguments().getString("filename");
-            String filenameURL = this.getArguments().getString("filenameURL");
+            mFilename = this.getArguments().getString("filename");
+            mFilenameURL = this.getArguments().getString("filenameURL");
 
-            if(filename==null){
-                onSaveButtonPressed();
+            if(mFilename==null){
+
             } else {
-                if(filename.endsWith("_b.jpg")){
+                if(mFilename.endsWith("_b.jpg")){
                     mHasBacksideText = true;
-                    filename = Utils.getFrontsideString(filename);
+                    mFilename = Utils.getFrontsideString(mFilename);
                 } else{
-                    mHasBacksideText = fbStore.filenames.contains(Utils.getBacksideString(filename));
+                    mHasBacksideText = fbStore.filenames.contains(Utils.getBacksideString(mFilename));
                 }
 
-                loadUrl(filenameURL, filename);
+                loadUrl(mFilenameURL, mFilename);
             }
         }
 
@@ -240,10 +235,10 @@ FirebaseStore.UploadDownloadListener{
                 int id = v.getId();
                 switch (id) {
                     case R.id.fab_save_changes:
-                        onSaveButtonPressed();
+                        onCheckButtonPressed();
                         break;
                     case R.id.fab_download:
-                        onSaveFABPressed();
+                        onDownloadFABPressed();
                         break;
                     case R.id.fab_rotate:
                         onRotateFabPressed();
@@ -324,14 +319,14 @@ FirebaseStore.UploadDownloadListener{
     }
 
     private void onGuidedSortPressed(){
-        guideHelper.setFilename(targetFilename);
+        guideHelper.setFilename(mFilename);
         showGuideDialog();
         HashMap<Integer,String> anchorMap = fbStore.getAnchorMap();
     }
 
     private void showGuideDialog(){
         GlideApp.with(getActivity().getApplicationContext())
-                .load(targetFilenameURL)
+                .load(mFilenameURL)
                 .placeholder(R.drawable.progress_animation)
                 .transform(new RotateTransformation(getActivity(), targetImageRotation))
                 .into(guideTarget);
@@ -447,34 +442,18 @@ FirebaseStore.UploadDownloadListener{
         datePickerDialog.show();
     }
 
-    private void getNextDownloadLink(){
-        Random random = new Random();
-
-        int index = random.nextInt(fbStore.filenames.size());
-        String filename = fbStore.filenames.get(index);
-
-        if(filename.endsWith("_b.jpg")){
-            mHasBacksideText = true;
-            filename = Utils.getFrontsideString(filename);
-        } else{
-            mHasBacksideText = fbStore.filenames.contains(Utils.getBacksideString(filename));
-        }
-
-        fbStore.getFirebaseDownloadURL(filename);
-    }
-
     private void displayImage() {
         Log.d("RCD","displayImage");
 
-        if(targetFilenameURL==null){
+        if(mFilenameURL==null){
             Log.d("RCD","targetFilenameURL was null");
             return;
         }
 
-        Log.d("RCD", targetFilenameURL);
+        Log.d("RCD", mFilenameURL);
 
         GlideApp.with(getActivity().getApplicationContext())
-                .load(targetFilenameURL)
+                .load(mFilenameURL)
                 .placeholder(R.drawable.progress_animation)
                 .into(targetImage);
 
@@ -517,37 +496,58 @@ FirebaseStore.UploadDownloadListener{
         fbStore.registerEraListener(null);
     }
 
-    public void onSaveButtonPressed() {
+    public void onCheckButtonPressed() {
         if (targetImageRotation != 0f) {
-            //implies that the previous image was rotated.
+            //implies that the image was rotated.
             Toast.makeText(mActivity,"Saving Rotation",Toast.LENGTH_LONG).show();
-            fbStore.uploadBitmapToFirebase(getActivity(), targetFilename,targetFilenameURL,targetImageRotation);
-        } else {
-            //TODO:  navigate back to View Fragment
+            fbStore.uploadBitmapToFirebase(getActivity(), mFilename,mFilenameURL,targetImageRotation);
         }
+
+        mActivity.sortFinished();
     }
 
-    public void onSaveFABPressed() {
-        downloadRequested = true;
-        fbStore.uploadBitmapToFirebase(getActivity(), targetFilename,targetFilenameURL,targetImageRotation);
+    public void onDownloadFABPressed() {
+        if (targetImageRotation != 0f) {
+            //fbStore.uploadBitmapToFirebase(getActivity(), targetFilename,targetFilenameURL,targetImageRotation);
+            //can't press download if rotated
+        } else {
+            fbStore.downloadTargetImage(mActivity,mFilename,mFilenameURL);
+        }
+
         targetImageRotation = 0f;
         Toast.makeText(getActivity(), "Saving Image", Toast.LENGTH_SHORT).show();
         fbStore.incrementDownloads();
     }
 
+    private void disableSave(){
+        fab_save.setEnabled(false);
+        fab_save.setAlpha(.3f);
+
+    }
+
+    private void reEnableSave() {
+        fab_save.setEnabled(true);
+        fab_save.setAlpha(1.0f);
+
+    }
+
     public void onRotateFabPressed() {
+        disableSave();
         targetImageRotation = targetImageRotation - 90;
         if (targetImageRotation < 0)
             targetImageRotation = targetImageRotation + 360;
         rotateTargetImage();
+        if(targetImageRotation==0) {
+            reEnableSave();
+        }
 
     }
 
     private void rotateTargetImage() {
         Log.d("RCD", "Rotating:");
-        Log.d("RCD", targetFilenameURL);
+        Log.d("RCD", mFilenameURL);
         GlideApp.with(this)
-                .load(targetFilenameURL)
+                .load(mFilenameURL)
                 .placeholder(R.drawable.progress_animation)
                 .transform(new RotateTransformation(getActivity(), targetImageRotation))
                 .into(targetImage);
@@ -559,14 +559,8 @@ FirebaseStore.UploadDownloadListener{
     private void loadUrl(String url, String filename){
         Log.d("download","getFirebaseDownloadURL:");
         Log.d("download",url);
-        targetFilename = filename;
-        targetFilenameURL = url;
-        getEraFromFireBase(targetFilename);
+        getEraFromFireBase(filename);
         onURLDownloaded();
-        if(downloadRequested){
-            fbStore.downloadTargetImage(getActivity(), filename,targetFilenameURL);
-            downloadRequested = false;
-        }
 
         if(mHasBacksideText){
             String backsideString = filename.substring(0,filename.length()-4) + "_b.jpg";
@@ -606,24 +600,27 @@ FirebaseStore.UploadDownloadListener{
         fbStore.incrementSorts();
         String date = Utils.getDateFromEra(era,getActivity());
         eraTextView.setText(era);
-        fbStore.updateImageDate(targetFilename,date);
-        fbStore.updateImageEra(targetFilename,era);
+        Log.d("RCD",String.format("Era updated to {}",era));
+        fbStore.updateImageDate(mFilename,date);
+        fbStore.updateImageEra(mFilename,era);
 
-        String backsideFilename = Utils.getBacksideString(targetFilename);
+        String backsideFilename = Utils.getBacksideString(mFilename);
         if(mHasBacksideText){
             fbStore.updateImageDate(backsideFilename,date);
             fbStore.updateImageEra(backsideFilename,era);
         }
+
+        mActivity.setCurrentEra(era);
 
     }
 
     private void onDateSelected(String date){
         String era = Utils.getEraFromDate(date, mActivity);
         eraTextView.setText(era);
-        fbStore.updateImageDate(targetFilename,date);
-        fbStore.updateImageEra(targetFilename,era);
+        fbStore.updateImageDate(mFilename,date);
+        fbStore.updateImageEra(mFilename,era);
 
-        String backsideFilename = Utils.getBacksideString(targetFilename);
+        String backsideFilename = Utils.getBacksideString(mFilename);
         if(mHasBacksideText){
             fbStore.updateImageDate(backsideFilename,date);
             fbStore.updateImageEra(backsideFilename,era);
@@ -636,16 +633,13 @@ FirebaseStore.UploadDownloadListener{
     }
 
     @Override
-    public void onUrlReceived(String url, String filename) {
+    public void onDownloadUrlReceived(String url, String filename) {
         loadUrl(url, filename);
     }
 
     @Override
     public void onUploadComplete(String filename) {
 
-        if(downloadRequested){
-            fbStore.getFirebaseDownloadURL(filename);
-        }
 
     }
 

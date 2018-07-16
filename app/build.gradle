@@ -57,6 +57,7 @@ dependencies {
     annotationProcessor 'com.github.bumptech.glide:compiler:4.7.1'
     implementation 'com.jsibbold:zoomage:1.1.0'
     implementation 'com.github.clans:fab:1.6.4'
+    implementation 'com.github.jorgecastilloprz:fabprogresscircle:1.01@aar'
 
     //implementation 'org.apache.commons:commons-imaging:1.0-SNAPSHOT'
 

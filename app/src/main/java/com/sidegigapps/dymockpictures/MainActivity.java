@@ -38,6 +38,8 @@ import com.sidegigapps.dymockpictures.fragments.SortPhotosFragment;
 import com.sidegigapps.dymockpictures.fragments.ViewPhotosFragment;
 import com.sidegigapps.dymockpictures.models.FirebaseStore;
 
+import java.util.ArrayList;
+
 public class MainActivity extends AppCompatActivity implements
         FirebaseStore.InitializationListener {
 
@@ -56,8 +58,29 @@ public class MainActivity extends AppCompatActivity implements
 
     FirebaseStore mFbStore;
 
+    PhotoGridViewAdapter mAdapter;
+
     Drawer drawer;
     private String currentFragment;
+    private ArrayList<String> mViewPhotoFragmentStoredFilenames;
+    private ArrayList<String> mViewPhotoFragmentStoredUrls;
+    private String mOriginalEra;
+    private String mImageToBeSortedFilename;
+
+    public String getCurrentEra() {
+        return mCurrentEra;
+    }
+
+    public void setCurrentEra(String era) {
+        if(!era.equals(this.mCurrentEra)) {
+            this.mCurrentEra = era;
+            if(currentFragment==VIEW_PHOTOS_FRAG){
+                viewPhotosFragment.onNewEraSelected(era);
+            }
+        }
+    }
+
+    String mCurrentEra;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,7 +100,8 @@ public class MainActivity extends AppCompatActivity implements
 
         setupDrawer();
 
-        viewPhotos();
+        mAdapter = new PhotoGridViewAdapter(this, new ArrayList<String>());
+        mCurrentEra = getResources().getStringArray(R.array.eras_array)[0];
 
     }
 
@@ -92,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements
     public void onBackPressed() {
 
         if(currentFragment.equals(SORT_PHOTOS_FRAG)){
-            viewPhotos();
+            viewPhotos(true);
         } else {
             new AlertDialog.Builder(this)
                     .setTitle("Sign Out?")
@@ -227,12 +251,12 @@ public class MainActivity extends AppCompatActivity implements
         viewPhotosItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
             @Override
             public boolean onItemClick(View view, int position, IDrawerItem drawerItem) {
-                viewPhotos();
+                viewPhotos(false);
                 drawer.closeDrawer();
                 return true;
             }
         });
-
+/*
         PrimaryDrawerItem sortPhotosItem = new PrimaryDrawerItem()
                 .withName("Sort Photos");
         sortPhotosItem.withOnDrawerItemClickListener(new Drawer.OnDrawerItemClickListener() {
@@ -242,7 +266,7 @@ public class MainActivity extends AppCompatActivity implements
                 drawer.closeDrawer();
                 return true;
             }
-        });
+        });*/
 
         PrimaryDrawerItem leaderboardItem = new PrimaryDrawerItem()
                 .withName("Leaderboards");
@@ -258,36 +282,31 @@ public class MainActivity extends AppCompatActivity implements
         drawer = new DrawerBuilder().withActivity(this)
                 .withAccountHeader(headerResult)
                 .withToolbar(mToolbar)
-                .addDrawerItems(viewPhotosItem, sortPhotosItem, leaderboardItem) //no achievements for now
+                .addDrawerItems(viewPhotosItem, leaderboardItem) //no achievements for now
                 .build();
 
     }
 
-    private void viewPhotos() {
+    private void viewPhotos(boolean restoreAdapter) {
         Log.d("RCD", "viewPhotos");
         getSupportActionBar().setTitle("Family Pictures");
+
 
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
         viewPhotosFragment = new ViewPhotosFragment();
 
-        if(currentFragment==SORT_PHOTOS_FRAG){
-            ft.remove(sortPhotosFragment);
+
+        Bundle bundle = new Bundle();
+        if(restoreAdapter) {
+            bundle.putStringArrayList("filenames",mViewPhotoFragmentStoredFilenames);
+            bundle.putStringArrayList("urls",mViewPhotoFragmentStoredUrls);
+            Log.d("RCD",String.format("STORED filenames: ",String.valueOf(mViewPhotoFragmentStoredFilenames.size())));
+            Log.d("RCD",String.format("STORED urls: ",String.valueOf(mViewPhotoFragmentStoredFilenames.size())));
+            viewPhotosFragment.setArguments(bundle);
         }
+
         ft.replace(R.id.fragment_layout, viewPhotosFragment);
         currentFragment = VIEW_PHOTOS_FRAG;
-
-        ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
-        ft.commit();
-    }
-
-    private void sortPhotos() {
-        Log.d("RCD", "sortPhotos");
-        getSupportActionBar().setTitle("Family Picture Sorting");
-        FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
-        sortPhotosFragment = new SortPhotosFragment();
-
-        ft.replace(R.id.fragment_layout, sortPhotosFragment);
-        currentFragment = SORT_PHOTOS_FRAG;
 
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();
@@ -321,15 +340,20 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onInitializationComplete() {
-        //viewPhotos();
+        viewPhotos(false);
 
-        Toast.makeText(this, "LOADING COMPLETE", Toast.LENGTH_SHORT).show();
+        //Toast.makeText(this, "LOADING COMPLETE", Toast.LENGTH_SHORT).show();
     }
 
-    public void onPhotoSelected(String filename, String filenameURL) {
+    public void onPhotoSelected(String filename, String filenameURL, ArrayList<String> filenames, ArrayList<String> urls) {
         Bundle bundle = new Bundle();
         bundle.putString("filename",filename);
         bundle.putString("filenameURL",filenameURL);
+
+        mOriginalEra = getCurrentEra();
+        mImageToBeSortedFilename = filename;
+        mViewPhotoFragmentStoredFilenames = filenames;
+        mViewPhotoFragmentStoredUrls = urls;
 
         getSupportActionBar().setTitle("Family Picture Sorting");
         FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
@@ -341,5 +365,15 @@ public class MainActivity extends AppCompatActivity implements
 
         ft.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
         ft.commit();
+    }
+
+    public void sortFinished() {
+        if(!mOriginalEra.equals(mCurrentEra)){
+            viewPhotos(false);
+            mFbStore.addImageToEra(mImageToBeSortedFilename,mCurrentEra,mOriginalEra);
+        } else {
+            viewPhotos(false);
+        }
+
     }
 }
